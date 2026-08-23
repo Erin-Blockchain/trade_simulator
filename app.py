@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components # Add this line
 import math
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -48,6 +49,25 @@ win_rate_pct = st.sidebar.number_input("Win Rate %", value=66.66, format="%.2f")
 n_trades = st.sidebar.number_input("Number of Trades", value=10, step=1)
 
 if st.sidebar.button("Run Simulation", type="primary"):
+    # --- Auto-Collapse Sidebar JS ---
+    collapse_js = """
+    <script>
+        const closeButton = window.parent.document.querySelector('[data-testid="baseButton-headerNoPadding"]');
+        if (closeButton) {
+            closeButton.click();
+        } else {
+            // Fallback for different Streamlit versions
+            const buttons = window.parent.document.querySelectorAll('button');
+            buttons.forEach(btn => {
+                if(btn.getAttribute('aria-label') === 'Collapse sidebar') {
+                    btn.click();
+                }
+            });
+        }
+    </script>
+    """
+    components.html(collapse_js, height=0, width=0)
+    
     # --- Core Calculations ---
     p = win_rate_pct / 100.0
     loss_rate = 1.0 - p
@@ -74,26 +94,36 @@ if st.sidebar.button("Run Simulation", type="primary"):
     probs_list = [item["prob"] * 100 for item in outcomes]
     pnl_list = [item["pnl"] for item in outcomes]
 
-    # --- 1. Top Metrics Row ---
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown(create_neon_card("EV Per Trade", f"${ev_per_trade:,.2f}", "#00ff88"), unsafe_allow_html=True)
-    with col2:
-        st.markdown(create_neon_card(f"Total EV ({n_trades} Trades)", f"${total_ev:,.2f}", "#00e5ff"), unsafe_allow_html=True)
-    with col3:
-        st.markdown(create_neon_card("Win Rate", f"{win_rate_pct}%", "#ff00aa"), unsafe_allow_html=True)
+    # --- 1. Top Metrics Row (Responsive Flexbox) ---
+    metrics_html = f"""
+    <div style="display: flex; justify-content: space-between; gap: 8px; margin-bottom: 20px; width: 100%;">
+        <div style="flex: 1; min-width: 0; background-color: #0a0e17; border: 1px solid #00ff88; border-radius: 8px; padding: 12px 5px; text-align: center; box-shadow: 0 0 12px #00ff8840;">
+            <div style="color: #a0aec0; font-size: clamp(9px, 2.5vw, 14px); margin-bottom: 5px; font-family: sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">EV Per Trade</div>
+            <div style="color: #00ff88; font-size: clamp(14px, 4vw, 28px); font-weight: bold; font-family: monospace;">${ev_per_trade:,.2f}</div>
+        </div>
+        <div style="flex: 1; min-width: 0; background-color: #0a0e17; border: 1px solid #00e5ff; border-radius: 8px; padding: 12px 5px; text-align: center; box-shadow: 0 0 12px #00e5ff40;">
+            <div style="color: #a0aec0; font-size: clamp(9px, 2.5vw, 14px); margin-bottom: 5px; font-family: sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Total EV ({n_trades} Trades)</div>
+            <div style="color: #00e5ff; font-size: clamp(14px, 4vw, 28px); font-weight: bold; font-family: monospace;">${total_ev:,.2f}</div>
+        </div>
+        <div style="flex: 1; min-width: 0; background-color: #0a0e17; border: 1px solid #ff00aa; border-radius: 8px; padding: 12px 5px; text-align: center; box-shadow: 0 0 12px #ff00aa40;">
+            <div style="color: #a0aec0; font-size: clamp(9px, 2.5vw, 14px); margin-bottom: 5px; font-family: sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Win Rate</div>
+            <div style="color: #ff00aa; font-size: clamp(14px, 4vw, 28px); font-weight: bold; font-family: monospace;">{win_rate_pct}%</div>
+        </div>
+    </div>
+    """
+    st.markdown(metrics_html, unsafe_allow_html=True)
 
-    # --- 2. Discrete Outcomes HTML Table ---
+    # --- 2. Discrete Outcomes HTML Table (Force-Fit) ---
     st.markdown(f"<h3 style='color: white; font-size: 16px; margin-top: 10px;'>Discrete Outcome Probabilities for {n_trades} Trades</h3>", unsafe_allow_html=True)
     
-    # Fix: Formatted as a flat string without indentation so Markdown doesn't mistake it for a code block
-    table_html = "<div style='background-color: #0a0e17; padding: 20px; border-radius: 8px; border: 1px solid #1f2937; margin-bottom: 30px;'>"
-    table_html += "<table style='width: 100%; border-collapse: collapse; color: white; font-family: monospace; text-align: center;'>"
-    table_html += "<tr style='border-bottom: 1px solid #333; color: #a0aec0;'><th style='padding: 10px;'>Wins</th><th style='padding: 10px;'>Losses</th><th style='padding: 10px;'>Probability</th><th style='padding: 10px;'>Total PnL</th></tr>"
+    # Strictly scaled font sizes and padding to prevent overflow
+    table_html = "<div style='background-color: #0a0e17; padding: clamp(10px, 3vw, 20px); border-radius: 8px; border: 1px solid #1f2937; margin-bottom: 30px; width: 100%; box-sizing: border-box;'>"
+    table_html += "<table style='width: 100%; border-collapse: collapse; color: white; font-family: monospace; text-align: center; font-size: clamp(9px, 2.5vw, 14px);'>"
+    table_html += "<tr style='border-bottom: 1px solid #333; color: #a0aec0;'><th style='padding: 10px clamp(2px, 1vw, 10px);'>Wins</th><th style='padding: 10px clamp(2px, 1vw, 10px);'>Losses</th><th style='padding: 10px clamp(2px, 1vw, 10px);'>Probability</th><th style='padding: 10px clamp(2px, 1vw, 10px);'>Total PnL</th></tr>"
     
     for item in outcomes:
         pnl_color = "#ff3366" if item['pnl'] < 0 else "#00ff88"
-        table_html += f"<tr style='border-bottom: 1px solid #1a202c;'><td style='padding: 10px;'>{item['wins']}</td><td style='padding: 10px;'>{item['losses']}</td><td style='padding: 10px;'>{item['prob']*100:.2f}%</td><td style='padding: 10px; color: {pnl_color}; font-weight: bold;'>${item['pnl']:,.2f}</td></tr>"
+        table_html += f"<tr style='border-bottom: 1px solid #1a202c;'><td style='padding: 10px clamp(2px, 1vw, 10px);'>{item['wins']}</td><td style='padding: 10px clamp(2px, 1vw, 10px);'>{item['losses']}</td><td style='padding: 10px clamp(2px, 1vw, 10px);'>{item['prob']*100:.2f}%</td><td style='padding: 10px clamp(2px, 1vw, 10px); color: {pnl_color}; font-weight: bold;'>${item['pnl']:,.2f}</td></tr>"
     
     table_html += "</table></div>"
     st.markdown(table_html, unsafe_allow_html=True)
@@ -102,20 +132,21 @@ if st.sidebar.button("Run Simulation", type="primary"):
     col_chart1, col_chart2 = st.columns(2)
     
     with col_chart1:
-        # Probability Bar Chart (Logic fix: Top 2 outcomes highlighted cyan)
+        # Probability Bar Chart
         bar_colors = ['#00e5ff' if w in top_2_wins else '#1f4287' for w in wins_list]
         fig_bar = go.Figure(data=[go.Bar(x=wins_list, y=probs_list, marker_color=bar_colors, opacity=0.9)])
         fig_bar.update_layout(
             title="Probability Distribution", title_font=dict(color="white"),
             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-            xaxis=dict(title="Number of Wins", color="#a0aec0", tickmode='linear', dtick=1, showgrid=False),
-            yaxis=dict(title="Probability (%)", color="#a0aec0", showgrid=True, gridcolor="#1a202c"),
-            margin=dict(l=20, r=20, t=40, b=20)
+            xaxis=dict(title="Number of Wins", color="#a0aec0", tickmode='linear', dtick=1, showgrid=False, fixedrange=True),
+            yaxis=dict(title="Probability (%)", color="#a0aec0", showgrid=True, gridcolor="#1a202c", fixedrange=True),
+            margin=dict(l=20, r=20, t=60, b=20),
+            dragmode=False
         )
-        st.plotly_chart(fig_bar, use_container_width=True)
+        st.plotly_chart(fig_bar, use_container_width=True, config={'displayModeBar': False})
 
     with col_chart2:
-        # PnL Line Chart (Logic fix: Line neutral, points red/green, break-even matched)
+        # PnL Line Chart 
         marker_colors = ['#ff3366' if pnl < 0 else '#00ff88' for pnl in pnl_list]
         fig_line = go.Figure()
         fig_line.add_trace(go.Scatter(
@@ -127,12 +158,13 @@ if st.sidebar.button("Run Simulation", type="primary"):
         fig_line.update_layout(
             title="Total PnL vs. Number of Wins", title_font=dict(color="white"),
             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-            xaxis=dict(title="Number of Wins", color="#a0aec0", tickmode='linear', dtick=1, showgrid=False),
-            yaxis=dict(title="Total PnL ($)", color="#a0aec0", showgrid=True, gridcolor="#1a202c"),
-            margin=dict(l=20, r=20, t=40, b=20),
-            showlegend=False
+            xaxis=dict(title="Number of Wins", color="#a0aec0", tickmode='linear', dtick=1, showgrid=False, fixedrange=True),
+            yaxis=dict(title="Total PnL ($)", color="#a0aec0", showgrid=True, gridcolor="#1a202c", fixedrange=True),
+            margin=dict(l=20, r=20, t=60, b=20),
+            showlegend=False,
+            dragmode=False
         )
-        st.plotly_chart(fig_line, use_container_width=True)
+        st.plotly_chart(fig_line, use_container_width=True, config={'displayModeBar': False})
 
     # --- 4. Conclusion Card ---
     st.markdown(f"""
