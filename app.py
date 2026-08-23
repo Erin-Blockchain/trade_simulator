@@ -29,7 +29,7 @@ st.markdown("""
 
 st.markdown("""
 <div style="background-color: #0a0e17; border: 1px solid #1a202c; border-radius: 6px; padding: 12px 16px; margin-bottom: 30px; display: flex; flex-wrap: nowrap; justify-content: space-between; align-items: center; gap: 10px;">
-    <div style="color: #ffffff; font-family: monospace; font-weight: bold; white-space: nowrap; font-size: clamp(11px, 3.5vw, 18px);">
+    <div style="color: #ffffff; font-family: monospace; font-weight: bold; white-space: nowrap; font-size: clamp(10px, 3vw, 16px);">
         &gt;_ STRATEGY_PERFORMANCE_ANALYSIS
     </div>
     <div style="color: #00ff88; font-family: monospace; white-space: nowrap; font-size: clamp(9px, 2.5vw, 14px);">
