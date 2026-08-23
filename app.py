@@ -27,7 +27,16 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1>✨ Trading Strategy Performance Analysis 📈</h1>", unsafe_allow_html=True)
+st.markdown("""
+<div style="background-color: #0a0e17; border: 1px solid #1a202c; border-radius: 6px; padding: 15px 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
+    <div style="color: #ffffff; font-family: monospace; font-size: 18px; font-weight: bold;">
+        >_ STRATEGY_PERFORMANCE_ANALYSIS
+    </div>
+    <div style="color: #00ff88; font-family: monospace; font-size: 14px;">
+        ● SYSTEM ACTIVE
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # --- Interactive Sidebar ---
 st.sidebar.markdown("<h2 style='color: white;'>Parameters</h2>", unsafe_allow_html=True)
