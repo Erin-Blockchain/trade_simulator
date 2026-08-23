@@ -49,20 +49,26 @@ win_rate_pct = st.sidebar.number_input("Win Rate %", value=66.66, format="%.2f")
 n_trades = st.sidebar.number_input("Number of Trades", value=10, step=1)
 
 if st.sidebar.button("Run Simulation", type="primary"):
-    # --- Auto-Collapse Sidebar JS ---
+    # --- Auto-Collapse Sidebar JS (Simulate Tap on Right Edge) ---
     collapse_js = """
     <script>
-        const closeButton = window.parent.document.querySelector('[data-testid="baseButton-headerNoPadding"]');
-        if (closeButton) {
-            closeButton.click();
-        } else {
-            // Fallback for different Streamlit versions
-            const buttons = window.parent.document.querySelectorAll('button');
-            buttons.forEach(btn => {
-                if(btn.getAttribute('aria-label') === 'Collapse sidebar') {
-                    btn.click();
-                }
-            });
+        const parentWindow = window.parent;
+        const parentDoc = window.parent.document;
+        
+        // Target coordinates: middle-right edge of the screen (where the overlay is)
+        const targetX = parentWindow.innerWidth - 10;
+        const targetY = parentWindow.innerHeight / 2;
+        
+        // Find whatever element covers the right side of the screen right now
+        const overlayElement = parentDoc.elementFromPoint(targetX, targetY);
+        
+        if (overlayElement) {
+            // Simulate a full touch/click sequence on that exact spot
+            const eventConfig = { bubbles: true, cancelable: true, view: parentWindow, clientX: targetX, clientY: targetY };
+            
+            overlayElement.dispatchEvent(new MouseEvent('mousedown', eventConfig));
+            overlayElement.dispatchEvent(new MouseEvent('mouseup', eventConfig));
+            overlayElement.dispatchEvent(new MouseEvent('click', eventConfig));
         }
     </script>
     """
