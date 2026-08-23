@@ -39,7 +39,7 @@ win_rate_pct = st.sidebar.number_input("Win Rate %", value=66.66, format="%.2f")
 n_trades = st.sidebar.number_input("Number of Trades", value=10, step=1)
 
 if st.sidebar.button("Run Simulation", type="primary"):
-    # --- Core Calculations ---[cite: 1]
+    # --- Core Calculations ---
     p = win_rate_pct / 100.0
     loss_rate = 1.0 - p
     loss_amount = -1.0 * capital * (sl_pct / 100.0)
@@ -55,7 +55,7 @@ if st.sidebar.button("Run Simulation", type="primary"):
         total_pnl = (wins * profit_amount) + (losses * loss_amount)
         outcomes.append({"wins": wins, "losses": losses, "prob": prob, "pnl": total_pnl})
 
-    # Find Top 2 Most Likely Outcomes[cite: 1]
+    # Find Top 2 Most Likely Outcomes
     sorted_outcomes = sorted(outcomes, key=lambda x: x["prob"], reverse=True)
     top_1, top_2 = sorted_outcomes[0], sorted_outcomes[1]
     top_2_wins = [top_1["wins"], top_2["wins"]]
@@ -77,23 +77,15 @@ if st.sidebar.button("Run Simulation", type="primary"):
     # --- 2. Discrete Outcomes HTML Table ---
     st.markdown(f"<h3 style='color: white; font-size: 16px; margin-top: 10px;'>Discrete Outcome Probabilities for {n_trades} Trades</h3>", unsafe_allow_html=True)
     
-    table_html = """
-    <div style="background-color: #0a0e17; padding: 20px; border-radius: 8px; border: 1px solid #1f2937; margin-bottom: 30px;">
-    <table style="width: 100%; border-collapse: collapse; color: white; font-family: monospace; text-align: center;">
-        <tr style="border-bottom: 1px solid #333; color: #a0aec0;">
-            <th style="padding: 10px;">Wins</th><th style="padding: 10px;">Losses</th><th style="padding: 10px;">Probability</th><th style="padding: 10px;">Total PnL</th>
-        </tr>
-    """
+    # Fix: Formatted as a flat string without indentation so Markdown doesn't mistake it for a code block
+    table_html = "<div style='background-color: #0a0e17; padding: 20px; border-radius: 8px; border: 1px solid #1f2937; margin-bottom: 30px;'>"
+    table_html += "<table style='width: 100%; border-collapse: collapse; color: white; font-family: monospace; text-align: center;'>"
+    table_html += "<tr style='border-bottom: 1px solid #333; color: #a0aec0;'><th style='padding: 10px;'>Wins</th><th style='padding: 10px;'>Losses</th><th style='padding: 10px;'>Probability</th><th style='padding: 10px;'>Total PnL</th></tr>"
+    
     for item in outcomes:
         pnl_color = "#ff3366" if item['pnl'] < 0 else "#00ff88"
-        table_html += f"""
-        <tr style="border-bottom: 1px solid #1a202c;">
-            <td style="padding: 10px;">{item['wins']}</td>
-            <td style="padding: 10px;">{item['losses']}</td>
-            <td style="padding: 10px;">{item['prob']*100:.2f}%</td>
-            <td style="padding: 10px; color: {pnl_color}; font-weight: bold;">${item['pnl']:,.2f}</td>
-        </tr>
-        """
+        table_html += f"<tr style='border-bottom: 1px solid #1a202c;'><td style='padding: 10px;'>{item['wins']}</td><td style='padding: 10px;'>{item['losses']}</td><td style='padding: 10px;'>{item['prob']*100:.2f}%</td><td style='padding: 10px; color: {pnl_color}; font-weight: bold;'>${item['pnl']:,.2f}</td></tr>"
+    
     table_html += "</table></div>"
     st.markdown(table_html, unsafe_allow_html=True)
 
@@ -180,7 +172,9 @@ if st.sidebar.button("Run Simulation", type="primary"):
 
         # 5d. Line Chart
         comp_fig.add_trace(go.Scatter(x=wins_list, y=pnl_list, mode='lines+markers', line=dict(color='#3a4a5a', width=2), marker=dict(size=8, color=marker_colors), showlegend=False), row=3, col=4)
-        comp_fig.add_hline(y=0, line_dash="dash", line_color="#ff3366", row=3, col=4)
+        
+        # Fix: Replaced add_hline with a robust scatter trace to avoid PlotlyKeyError on complex subplots
+        comp_fig.add_trace(go.Scatter(x=[min(wins_list), max(wins_list)], y=[0, 0], mode='lines', line=dict(dash="dash", color="#ff3366", width=2), showlegend=False), row=3, col=4)
 
         # 5e. Layout & Annotations
         comp_fig.update_layout(
