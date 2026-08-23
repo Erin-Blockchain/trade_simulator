@@ -17,7 +17,7 @@ def create_neon_card(title, value, color):
     """
 
 # --- Page Config ---
-st.set_page_config(page_title="Trading Model Analysis", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Trading Model Analysis", layout="wide", initial_sidebar_state="collapsed")
 
 # Inject global CSS for the terminal feel
 st.markdown("""
@@ -28,11 +28,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("""
-<div style="background-color: #0a0e17; border: 1px solid #1a202c; border-radius: 6px; padding: 15px 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
-    <div style="color: #ffffff; font-family: monospace; font-size: 18px; font-weight: bold;">
-        >_ STRATEGY_PERFORMANCE_ANALYSIS
+<div style="background-color: #0a0e17; border: 1px solid #1a202c; border-radius: 6px; padding: 12px 16px; margin-bottom: 30px; display: flex; flex-wrap: nowrap; justify-content: space-between; align-items: center; gap: 10px;">
+    <div style="color: #ffffff; font-family: monospace; font-weight: bold; white-space: nowrap; font-size: clamp(11px, 3.5vw, 18px);">
+        &gt;_ STRATEGY_PERFORMANCE_ANALYSIS
     </div>
-    <div style="color: #00ff88; font-family: monospace; font-size: 14px;">
+    <div style="color: #00ff88; font-family: monospace; white-space: nowrap; font-size: clamp(9px, 2.5vw, 14px);">
         ● SYSTEM ACTIVE
     </div>
 </div>
@@ -214,3 +214,13 @@ if st.sidebar.button("Run Simulation", type="primary"):
             )
         except ValueError as e:
             st.error("Error generating PNG. Make sure 'kaleido' is installed in your Python environment (`pip install kaleido`).")
+else:
+    st.markdown("""
+    <div style="background-color: #0a0e17; border: 1px solid #1f2937; border-radius: 8px; padding: 30px 24px; text-align: center; margin-top: 10px;">
+        <div style="color: #ffffff; font-size: 20px; font-weight: bold; margin-bottom: 10px;">Back your conviction with math.</div>
+        <div style="color: #a0aec0; font-size: 15px; line-height: 1.6;">
+            See your real odds of profit before you risk a dollar.<br>
+            Open <b style="color:#ff6b6b;">Parameters</b> (top-left ») , set your capital, stop-loss, take-profit, win rate and number of trades, then press <b style="color:#00ff88;">Run Simulation</b>.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
