@@ -243,7 +243,7 @@ if st.sidebar.button("Run Simulation", type="primary"):
 
         # Generate bytes via Kaleido
         try:
-            img_bytes = comp_fig.to_image(format="png", engine="kaleido", scale=2)
+            img_bytes = comp_fig.to_image(format="png", scale=2)
             st.download_button(
                 label="📥 Download Full Report as PNG",
                 data=img_bytes,
