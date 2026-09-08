@@ -58,6 +58,12 @@
             z-index: 100;
         }
 
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
         .brand {
             display: flex;
             align-items: center;
@@ -103,6 +109,21 @@
         }
 
         @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+
+        /* Mobile Menu Toggle Button */
+        .mobile-params-btn {
+            display: none;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            align-items: center;
+            gap: 6px;
+        }
 
         /* --- Nav Tabs --- */
         .nav-tabs {
@@ -159,11 +180,25 @@
             grid-template-columns: 320px 1fr;
             gap: 20px;
             flex-grow: 1;
+            position: relative;
         }
 
-        @media (max-width: 1024px) { .container { grid-template-columns: 1fr; } }
+        @media (max-width: 1024px) { 
+            .container { grid-template-columns: 1fr; } 
+            .mobile-params-btn { display: inline-flex; }
+        }
 
-        /* --- Sidebar & Controls --- */
+        /* --- Sidebar & Slide-in Drawer --- */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 999;
+        }
+        .sidebar-overlay.active { display: block; }
+
         .sidebar {
             background-color: var(--bg-card);
             border: 1px solid var(--border-color);
@@ -173,6 +208,24 @@
             flex-direction: column;
             gap: 16px;
             height: fit-content;
+        }
+
+        @media (max-width: 1024px) {
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: -320px;
+                width: 300px;
+                height: 100vh;
+                z-index: 1000;
+                border-radius: 0 8px 8px 0;
+                overflow-y: auto;
+                transition: transform 0.3s ease-in-out;
+                box-shadow: 10px 0 30px rgba(0,0,0,0.8);
+            }
+            .sidebar.open {
+                transform: translateX(320px);
+            }
         }
 
         .sidebar-title {
@@ -188,6 +241,16 @@
             border-bottom: 1px solid var(--border-color);
             padding-bottom: 12px;
         }
+
+        .close-drawer {
+            display: none;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 16px;
+            cursor: pointer;
+        }
+        @media (max-width: 1024px) { .close-drawer { display: block; } }
 
         .input-group { display: flex; flex-direction: column; gap: 6px; }
         .input-group label { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); }
@@ -224,22 +287,27 @@
 
         /* --- Main Content Area --- */
         .main-content { display: flex; flex-direction: column; gap: 20px; }
-        .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-        @media (max-width: 640px) { .metrics-grid { grid-template-columns: 1fr; } }
+        
+        /* Metrics Grid: Single line horizontally across all viewports */
+        .metrics-grid { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 12px; 
+        }
 
         .metric-card {
             background-color: var(--bg-card);
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            padding: 16px;
+            padding: 14px 10px;
             text-align: center;
         }
         .metric-card.green { border-color: rgba(0, 255, 136, 0.3); box-shadow: inset 0 0 12px rgba(0, 255, 136, 0.05); }
         .metric-card.cyan { border-color: rgba(0, 229, 255, 0.3); box-shadow: inset 0 0 12px rgba(0, 229, 255, 0.05); }
         .metric-card.pink { border-color: rgba(255, 0, 127, 0.3); box-shadow: inset 0 0 12px rgba(255, 0, 127, 0.05); }
 
-        .metric-label { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; margin-bottom: 6px; }
-        .metric-value { font-family: var(--font-mono); font-size: 26px; font-weight: 800; }
+        .metric-label { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .metric-value { font-family: var(--font-mono); font-size: clamp(14px, 3vw, 24px); font-weight: 800; }
         .metric-card.green .metric-value { color: var(--neon-green); }
         .metric-card.cyan .metric-value { color: var(--neon-cyan); }
         .metric-card.pink .metric-value { color: var(--neon-pink); }
@@ -255,13 +323,7 @@
         .insight-title { color: var(--neon-green); font-family: var(--font-mono); font-weight: 700; font-size: 14px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
         .insight-text { color: var(--text-main); font-size: 14px; line-height: 1.6; }
 
-        /* Charts Container */
-        .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
-        .chart-box { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; }
-        .chart-title { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase; }
-
-        /* Table */
+        /* Table placed before charts */
         .table-box { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 13px; text-align: left; }
         th { color: var(--text-muted); padding: 10px; border-bottom: 1px solid var(--border-color); font-weight: 600; font-size: 11px; text-transform: uppercase; }
@@ -269,6 +331,22 @@
         tr:last-child td { border-bottom: none; }
         .val-profit { color: var(--neon-green); font-weight: 600; }
         .val-loss { color: var(--neon-red); font-weight: 600; }
+
+        /* Charts Container: Side by side layout */
+        .charts-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 20px; 
+        }
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: repeat(2, minmax(260px, 1fr));
+                overflow-x: auto;
+                padding-bottom: 8px;
+            }
+        }
+        .chart-box { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; min-width: 0; }
+        .chart-title { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase; }
 
         /* Lock Screen Placeholder */
         .locked-view {
@@ -281,16 +359,23 @@
     </style>
 </head>
 <body>
+    <!-- Sidebar Backdrop Overlay for Mobile -->
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
     <!-- Header -->
     <header>
         <div class="brand">
-            <!-- Ensure logo.png is inside your 'static' folder -->
             <img src="{{ url_for('static', filename='logo.png') }}" alt="Seekal Logo">
             <span><span class="brand-badge">SEEKAL</span></span>
         </div>
-        <div class="status-pill">
-            <span class="status-dot"></span>
-            SYSTEM ONLINE
+        <div class="header-right">
+            <button class="mobile-params-btn" onclick="toggleSidebar()">
+                ⚙ PARAMETERS
+            </button>
+            <div class="status-pill">
+                <span class="status-dot"></span>
+                SYSTEM ONLINE
+            </div>
         </div>
     </header>
 
@@ -305,11 +390,11 @@
     <!-- Main Container -->
     <div class="container">
         
-        <!-- Sidebar Controls -->
+        <!-- Sidebar Controls (Slide-in Drawer on Mobile) -->
         <div class="sidebar" id="sidebar-controls">
             <div class="sidebar-title">
                 <span>Parameters</span>
-                <span style="color: var(--neon-green); font-size: 10px;">[EDIT]</span>
+                <button class="close-drawer" onclick="toggleSidebar()">✕</button>
             </div>
             <div class="input-group">
                 <label for="capital">Capital per Trade ($)</label>
@@ -337,14 +422,14 @@
         <!-- Tool View: Simulator (Active) -->
         <div class="main-content" id="view-sim">
             
-            <!-- Metrics Row -->
+            <!-- Metrics Row (Single Horizontal Line) -->
             <div class="metrics-grid">
                 <div class="metric-card green">
-                    <div class="metric-label">EV Per Trade</div>
+                    <div class="metric-label">EV / Trade</div>
                     <div class="metric-value" id="res-ev">$0.00</div>
                 </div>
                 <div class="metric-card cyan">
-                    <div class="metric-label" id="res-total-ev-label">Total EV (10 Trades)</div>
+                    <div class="metric-label" id="res-total-ev-label">Total EV</div>
                     <div class="metric-value" id="res-total-ev">$0.00</div>
                 </div>
                 <div class="metric-card pink">
@@ -361,19 +446,7 @@
                 </div>
             </div>
 
-            <!-- Visual Charts -->
-            <div class="charts-grid">
-                <div class="chart-box">
-                    <div class="chart-title">// Probability Distribution (%)</div>
-                    <canvas id="barChart" height="200"></canvas>
-                </div>
-                <div class="chart-box">
-                    <div class="chart-title">// Total PnL vs Wins ($)</div>
-                    <canvas id="lineChart" height="200"></canvas>
-                </div>
-            </div>
-
-            <!-- Discrete Table -->
+            <!-- Discrete Table (Positioned BEFORE Charts) -->
             <div class="table-box">
                 <div class="chart-title" style="margin-bottom: 12px;">// Discrete Outcome Probabilities</div>
                 <table>
@@ -390,6 +463,18 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Visual Charts (Side by Side) -->
+            <div class="charts-grid">
+                <div class="chart-box">
+                    <div class="chart-title">// Probability Distribution (%)</div>
+                    <canvas id="barChart" height="200"></canvas>
+                </div>
+                <div class="chart-box">
+                    <div class="chart-title">// Total PnL vs Wins ($)</div>
+                    <canvas id="lineChart" height="200"></canvas>
+                </div>
+            </div>
         </div>
 
         <!-- Tool View: Placeholder -->
@@ -400,19 +485,29 @@
         </div>
     </div>
 
-    <!-- Logic Script with Fetch API to connect to Flask Backend -->
+    <!-- Logic Script -->
     <script>
         let barChartInstance = null;
         let lineChartInstance = null;
 
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar-controls');
+            const overlay = document.getElementById('sidebar-overlay');
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('active');
+        }
+
         async function runSimulation() {
-            // Grab UI Button to show loading state
             const btn = document.getElementById('sim-btn');
             const originalText = btn.innerText;
             btn.innerText = "CALCULATING...";
             btn.style.opacity = "0.7";
 
-            // 1. Gather Inputs mapped exactly to app.py requirements
+            // Close sidebar drawer automatically on mobile after running
+            if (window.innerWidth <= 1024) {
+                toggleSidebar();
+            }
+
             const payload = {
                 capital: parseFloat(document.getElementById('capital').value) || 0,
                 sl_pct: parseFloat(document.getElementById('sl').value) || 0,
@@ -422,42 +517,32 @@
             };
 
             try {
-                // 2. Fetch Data from Flask /api/simulate endpoint
                 const response = await fetch('/api/simulate', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
                 const data = await response.json();
-
-                // 3. Destructure Python Backend Response
                 const evPerTrade = data.ev_per_trade;
                 const totalEv = data.total_ev;
                 const outcomes = data.outcomes;
                 const winRatePct = payload.win_rate;
                 const nTrades = payload.n_trades;
 
-                // 4. Calculate Insight Helpers (Top 2 outcomes)
                 let sortedOutcomes = [...outcomes].sort((a, b) => b.prob - a.prob);
                 let top1 = sortedOutcomes[0];
                 let top2 = sortedOutcomes[1] || sortedOutcomes[0];
                 let top2Wins = [top1.wins, top2.wins];
                 let combinedProb = top1.prob + (top1 !== top2 ? top2.prob : 0);
 
-                // 5. Update Metrics UI
                 document.getElementById('res-ev').innerText = `$${evPerTrade.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
                 document.getElementById('res-total-ev').innerText = `$${totalEv.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-                document.getElementById('res-total-ev-label').innerText = `Total EV (${nTrades} Trades)`;
+                document.getElementById('res-total-ev-label').innerText = `Total EV (${nTrades})`;
                 document.getElementById('res-winrate').innerText = `${winRatePct}%`;
 
-                // 6. Update Insight Box
                 const top1PnlFormatted = `<span class="${top1.pnl >= 0 ? 'val-profit' : 'val-loss'}">$${top1.pnl.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>`;
                 const top2PnlFormatted = `<span class="${top2.pnl >= 0 ? 'val-profit' : 'val-loss'}">$${top2.pnl.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>`;
                 
@@ -468,7 +553,6 @@
                     out of your <b>${nTrades}</b> trades.
                 `;
 
-                // 7. Update Table
                 const tbody = document.getElementById('outcomes-table-body');
                 tbody.innerHTML = '';
                 outcomes.forEach(item => {
@@ -483,7 +567,6 @@
                     tbody.appendChild(tr);
                 });
 
-                // 8. Update Charts
                 renderBarChart(outcomes, top2Wins);
                 renderLineChart(outcomes);
 
@@ -491,7 +574,6 @@
                 console.error("Simulation failed:", error);
                 document.getElementById('res-insight').innerHTML = `<span style="color: var(--neon-red)">Error contacting API. Make sure Flask backend is running.</span>`;
             } finally {
-                // Restore Button State
                 btn.innerText = originalText;
                 btn.style.opacity = "1";
             }
@@ -508,7 +590,7 @@
             barChartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: { labels: labels, datasets: [{ data: data, backgroundColor: bgColors, borderRadius: 4 }] },
-                options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono' } }, grid: { display: false } }, y: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono' } }, grid: { color: '#162032' } } } }
+                options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 10 } }, grid: { display: false } }, y: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 10 } }, grid: { color: '#162032' } } } }
             });
         }
 
@@ -522,8 +604,8 @@
 
             lineChartInstance = new Chart(ctx, {
                 type: 'line',
-                data: { labels: labels, datasets: [{ data: data, borderColor: '#26354f', borderWidth: 2, pointBackgroundColor: pointColors, pointRadius: 5 }] },
-                options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono' } }, grid: { display: false } }, y: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono' } }, grid: { color: '#162032' } } } }
+                data: { labels: labels, datasets: [{ data: data, borderColor: '#26354f', borderWidth: 2, pointBackgroundColor: pointColors, pointRadius: 4 }] },
+                options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 10 } }, grid: { display: false } }, y: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 10 } }, grid: { color: '#162032' } } } }
             });
         }
 
@@ -552,7 +634,6 @@
             }
         }
 
-        // Run simulation automatically when page loads
         window.onload = () => { runSimulation(); };
     </script>
 </body>
