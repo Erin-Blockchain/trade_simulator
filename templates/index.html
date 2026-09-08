@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEEKAL // Terminal</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-main: #04060a;
+            --bg-card: #090d16;
+            --border-color: #162032;
+            --neon-green: #00ff88;
+            --neon-cyan: #00e5ff;
+            --neon-pink: #ff007f;
+            --neon-red: #ff3366;
+            --text-main: #e2e8f0;
+            --text-muted: #64748b;
+            --font-mono: 'JetBrains Mono', monospace;
+            --font-sans: 'Inter', sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            font-size: 14px;
+            line-height: 1.5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(0, 255, 136, 0.03) 0%, transparent 70%),
+                linear-gradient(rgba(22, 32, 50, 0.2) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(22, 32, 50, 0.2) 1px, transparent 1px);
+            background-size: 100% 100%, 30px 30px, 30px 30px;
+        }
+
+        /* --- Header / Top Bar --- */
+        header {
+            background-color: rgba(9, 13, 22, 0.8);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-family: var(--font-mono);
+            font-weight: 800;
+            font-size: 20px;
+            letter-spacing: 1px;
+        }
+
+        .brand img {
+            height: 36px;
+            width: auto;
+            filter: drop-shadow(0 0 8px rgba(0, 255, 136, 0.4));
+        }
+
+        .brand-badge {
+            background: linear-gradient(135deg, var(--neon-green), #009955);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-family: var(--font-mono);
+            color: var(--neon-green);
+            background: rgba(0, 255, 136, 0.08);
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            padding: 4px 10px;
+            border-radius: 4px;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            background-color: var(--neon-green);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--neon-green);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+
+        /* --- Nav Tabs --- */
+        .nav-tabs {
+            display: flex;
+            gap: 4px;
+            background-color: rgba(4, 6, 10, 0.6);
+            border-bottom: 1px solid var(--border-color);
+            padding: 8px 24px 0 24px;
+            overflow-x: auto;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            border-bottom: none;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            padding: 8px 16px;
+            border-radius: 6px 6px 0 0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .tab-btn:hover { color: var(--text-main); background-color: rgba(255, 255, 255, 0.02); }
+        .tab-btn.active {
+            color: var(--neon-green);
+            background-color: var(--bg-card);
+            border-color: var(--border-color);
+            border-bottom: 2px solid var(--neon-green);
+            font-weight: 600;
+        }
+
+        .tab-btn .badge-soon {
+            font-size: 9px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+
+        /* --- Main Layout Grid --- */
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 24px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 20px;
+            flex-grow: 1;
+        }
+
+        @media (max-width: 1024px) { .container { grid-template-columns: 1fr; } }
+
+        /* --- Sidebar & Controls --- */
+        .sidebar {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            height: fit-content;
+        }
+
+        .sidebar-title {
+            font-family: var(--font-mono);
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-main);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+        }
+
+        .input-group { display: flex; flex-direction: column; gap: 6px; }
+        .input-group label { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); }
+        .input-group input {
+            background-color: #050810;
+            border: 1px solid var(--border-color);
+            color: var(--neon-green);
+            font-family: var(--font-mono);
+            font-size: 14px;
+            padding: 10px 12px;
+            border-radius: 6px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .input-group input:focus { border-color: var(--neon-green); box-shadow: 0 0 8px rgba(0, 255, 136, 0.2); }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #009955, #00ff88);
+            color: #000000;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 8px;
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.2);
+        }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 0 20px rgba(0, 255, 136, 0.4); }
+
+        /* --- Main Content Area --- */
+        .main-content { display: flex; flex-direction: column; gap: 20px; }
+        .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        @media (max-width: 640px) { .metrics-grid { grid-template-columns: 1fr; } }
+
+        .metric-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+        }
+        .metric-card.green { border-color: rgba(0, 255, 136, 0.3); box-shadow: inset 0 0 12px rgba(0, 255, 136, 0.05); }
+        .metric-card.cyan { border-color: rgba(0, 229, 255, 0.3); box-shadow: inset 0 0 12px rgba(0, 229, 255, 0.05); }
+        .metric-card.pink { border-color: rgba(255, 0, 127, 0.3); box-shadow: inset 0 0 12px rgba(255, 0, 127, 0.05); }
+
+        .metric-label { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; margin-bottom: 6px; }
+        .metric-value { font-family: var(--font-mono); font-size: 26px; font-weight: 800; }
+        .metric-card.green .metric-value { color: var(--neon-green); }
+        .metric-card.cyan .metric-value { color: var(--neon-cyan); }
+        .metric-card.pink .metric-value { color: var(--neon-pink); }
+
+        /* Insight Card */
+        .insight-card {
+            background: linear-gradient(135deg, rgba(9, 13, 22, 0.9), rgba(15, 22, 36, 0.9));
+            border: 1px solid var(--neon-green);
+            border-radius: 8px;
+            padding: 18px 20px;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.1);
+        }
+        .insight-title { color: var(--neon-green); font-family: var(--font-mono); font-weight: 700; font-size: 14px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+        .insight-text { color: var(--text-main); font-size: 14px; line-height: 1.6; }
+
+        /* Charts Container */
+        .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
+        .chart-box { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; }
+        .chart-title { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase; }
+
+        /* Table */
+        .table-box { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 13px; text-align: left; }
+        th { color: var(--text-muted); padding: 10px; border-bottom: 1px solid var(--border-color); font-weight: 600; font-size: 11px; text-transform: uppercase; }
+        td { padding: 10px; border-bottom: 1px solid rgba(22, 32, 50, 0.5); }
+        tr:last-child td { border-bottom: none; }
+        .val-profit { color: var(--neon-green); font-weight: 600; }
+        .val-loss { color: var(--neon-red); font-weight: 600; }
+
+        /* Lock Screen Placeholder */
+        .locked-view {
+            display: none; background-color: var(--bg-card); border: 1px border-style var(--border-color);
+            border-radius: 8px; padding: 80px 20px; text-align: center; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+        }
+        .locked-icon { font-size: 32px; margin-bottom: 8px; }
+        .locked-title { font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--neon-green); }
+        .locked-desc { color: var(--text-muted); max-width: 400px; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="brand">
+            <!-- Ensure logo.png is inside your 'static' folder -->
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Seekal Logo">
+            <span><span class="brand-badge">SEEKAL</span></span>
+        </div>
+        <div class="status-pill">
+            <span class="status-dot"></span>
+            SYSTEM ONLINE
+        </div>
+    </header>
+
+    <!-- Nav Tabs -->
+    <div class="nav-tabs">
+        <button class="tab-btn active" onclick="switchTab('sim')"><span>01</span> TRADE_SIMULATOR</button>
+        <button class="tab-btn" onclick="switchTab('intel')"><span>02</span> TOKEN_INTEL <span class="badge-soon">SOON</span></button>
+        <button class="tab-btn" onclick="switchTab('order')"><span>03</span> AVG_ORDER_SIZE <span class="badge-soon">SOON</span></button>
+        <button class="tab-btn" onclick="switchTab('buyer')"><span>04</span> BUYER_CONCENTRATION <span class="badge-soon">SOON</span></button>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        
+        <!-- Sidebar Controls -->
+        <div class="sidebar" id="sidebar-controls">
+            <div class="sidebar-title">
+                <span>Parameters</span>
+                <span style="color: var(--neon-green); font-size: 10px;">[EDIT]</span>
+            </div>
+            <div class="input-group">
+                <label for="capital">Capital per Trade ($)</label>
+                <input type="number" id="capital" value="100.00" step="10">
+            </div>
+            <div class="input-group">
+                <label for="sl">Stop-Loss (%)</label>
+                <input type="number" id="sl" value="70.00" step="5">
+            </div>
+            <div class="input-group">
+                <label for="tp">Take-Profit Multiplier (x)</label>
+                <input type="number" id="tp" value="10.00" step="0.5">
+            </div>
+            <div class="input-group">
+                <label for="winrate">Win Rate (%)</label>
+                <input type="number" id="winrate" value="66.66" step="1">
+            </div>
+            <div class="input-group">
+                <label for="trades">Number of Trades</label>
+                <input type="number" id="trades" value="10" step="1">
+            </div>
+            <button class="btn-primary" id="sim-btn" onclick="runSimulation()">Run Simulation ↵</button>
+        </div>
+
+        <!-- Tool View: Simulator (Active) -->
+        <div class="main-content" id="view-sim">
+            
+            <!-- Metrics Row -->
+            <div class="metrics-grid">
+                <div class="metric-card green">
+                    <div class="metric-label">EV Per Trade</div>
+                    <div class="metric-value" id="res-ev">$0.00</div>
+                </div>
+                <div class="metric-card cyan">
+                    <div class="metric-label" id="res-total-ev-label">Total EV (10 Trades)</div>
+                    <div class="metric-value" id="res-total-ev">$0.00</div>
+                </div>
+                <div class="metric-card pink">
+                    <div class="metric-label">Win Rate</div>
+                    <div class="metric-value" id="res-winrate">0%</div>
+                </div>
+            </div>
+
+            <!-- Insight Box -->
+            <div class="insight-card">
+                <div class="insight-title">🎯 Alpha Probability</div>
+                <div class="insight-text" id="res-insight">
+                    Run simulation to compute probability distribution and expected values.
+                </div>
+            </div>
+
+            <!-- Visual Charts -->
+            <div class="charts-grid">
+                <div class="chart-box">
+                    <div class="chart-title">// Probability Distribution (%)</div>
+                    <canvas id="barChart" height="200"></canvas>
+                </div>
+                <div class="chart-box">
+                    <div class="chart-title">// Total PnL vs Wins ($)</div>
+                    <canvas id="lineChart" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- Discrete Table -->
+            <div class="table-box">
+                <div class="chart-title" style="margin-bottom: 12px;">// Discrete Outcome Probabilities</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Wins</th>
+                            <th>Losses</th>
+                            <th>Probability</th>
+                            <th>Total PnL</th>
+                        </tr>
+                    </thead>
+                    <tbody id="outcomes-table-body">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tool View: Placeholder -->
+        <div class="main-content locked-view" id="view-locked">
+            <div class="locked-icon">⚔️</div>
+            <div class="locked-title" id="locked-title">MODULE_LOCKED</div>
+            <div class="locked-desc">Historical data indexing in progress. This Seekal tool will be available in the next deployment update.</div>
+        </div>
+    </div>
+
+    <!-- Logic Script with Fetch API to connect to Flask Backend -->
+    <script>
+        let barChartInstance = null;
+        let lineChartInstance = null;
+
+        async function runSimulation() {
+            // Grab UI Button to show loading state
+            const btn = document.getElementById('sim-btn');
+            const originalText = btn.innerText;
+            btn.innerText = "CALCULATING...";
+            btn.style.opacity = "0.7";
+
+            // 1. Gather Inputs mapped exactly to app.py requirements
+            const payload = {
+                capital: parseFloat(document.getElementById('capital').value) || 0,
+                sl_pct: parseFloat(document.getElementById('sl').value) || 0,
+                tp_mult: parseFloat(document.getElementById('tp').value) || 0,
+                win_rate: parseFloat(document.getElementById('winrate').value) || 0,
+                n_trades: parseInt(document.getElementById('trades').value) || 0
+            };
+
+            try {
+                // 2. Fetch Data from Flask /api/simulate endpoint
+                const response = await fetch('/api/simulate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                // 3. Destructure Python Backend Response
+                const evPerTrade = data.ev_per_trade;
+                const totalEv = data.total_ev;
+                const outcomes = data.outcomes;
+                const winRatePct = payload.win_rate;
+                const nTrades = payload.n_trades;
+
+                // 4. Calculate Insight Helpers (Top 2 outcomes)
+                let sortedOutcomes = [...outcomes].sort((a, b) => b.prob - a.prob);
+                let top1 = sortedOutcomes[0];
+                let top2 = sortedOutcomes[1] || sortedOutcomes[0];
+                let top2Wins = [top1.wins, top2.wins];
+                let combinedProb = top1.prob + (top1 !== top2 ? top2.prob : 0);
+
+                // 5. Update Metrics UI
+                document.getElementById('res-ev').innerText = `$${evPerTrade.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                document.getElementById('res-total-ev').innerText = `$${totalEv.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                document.getElementById('res-total-ev-label').innerText = `Total EV (${nTrades} Trades)`;
+                document.getElementById('res-winrate').innerText = `${winRatePct}%`;
+
+                // 6. Update Insight Box
+                const top1PnlFormatted = `<span class="${top1.pnl >= 0 ? 'val-profit' : 'val-loss'}">$${top1.pnl.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>`;
+                const top2PnlFormatted = `<span class="${top2.pnl >= 0 ? 'val-profit' : 'val-loss'}">$${top2.pnl.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>`;
+                
+                document.getElementById('res-insight').innerHTML = `
+                    There is a combined <b style="color: var(--neon-green);">${(combinedProb * 100).toFixed(2)}%</b> chance that you will hit 
+                    either <b>${top1.wins} wins</b> (yielding ${top1PnlFormatted}) 
+                    or <b>${top2.wins} wins</b> (yielding ${top2PnlFormatted}) 
+                    out of your <b>${nTrades}</b> trades.
+                `;
+
+                // 7. Update Table
+                const tbody = document.getElementById('outcomes-table-body');
+                tbody.innerHTML = '';
+                outcomes.forEach(item => {
+                    const tr = document.createElement('tr');
+                    const pnlClass = item.pnl >= 0 ? 'val-profit' : 'val-loss';
+                    tr.innerHTML = `
+                        <td>${item.wins}</td>
+                        <td>${item.losses}</td>
+                        <td>${(item.prob * 100).toFixed(2)}%</td>
+                        <td class="${pnlClass}">$${item.pnl.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                // 8. Update Charts
+                renderBarChart(outcomes, top2Wins);
+                renderLineChart(outcomes);
+
+            } catch (error) {
+                console.error("Simulation failed:", error);
+                document.getElementById('res-insight').innerHTML = `<span style="color: var(--neon-red)">Error contacting API. Make sure Flask backend is running.</span>`;
+            } finally {
+                // Restore Button State
+                btn.innerText = originalText;
+                btn.style.opacity = "1";
+            }
+        }
+
+        function renderBarChart(outcomes, top2Wins) {
+            const ctx = document.getElementById('barChart').getContext('2d');
+            const labels = outcomes.map(o => `${o.wins} W`);
+            const data = outcomes.map(o => (o.prob * 100).toFixed(2));
+            const bgColors = outcomes.map(o => top2Wins.includes(o.wins) ? '#00ff88' : '#162032');
+
+            if (barChartInstance) barChartInstance.destroy();
+
+            barChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: labels, datasets: [{ data: data, backgroundColor: bgColors, borderRadius: 4 }] },
+                options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono' } }, grid: { display: false } }, y: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono' } }, grid: { color: '#162032' } } } }
+            });
+        }
+
+        function renderLineChart(outcomes) {
+            const ctx = document.getElementById('lineChart').getContext('2d');
+            const labels = outcomes.map(o => `${o.wins} W`);
+            const data = outcomes.map(o => o.pnl);
+            const pointColors = outcomes.map(o => o.pnl >= 0 ? '#00ff88' : '#ff3366');
+
+            if (lineChartInstance) lineChartInstance.destroy();
+
+            lineChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels: labels, datasets: [{ data: data, borderColor: '#26354f', borderWidth: 2, pointBackgroundColor: pointColors, pointRadius: 5 }] },
+                options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono' } }, grid: { display: false } }, y: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono' } }, grid: { color: '#162032' } } } }
+            });
+        }
+
+        function switchTab(tabKey) {
+            const buttons = document.querySelectorAll('.tab-btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+
+            const simView = document.getElementById('view-sim');
+            const lockedView = document.getElementById('view-locked');
+            const sidebar = document.getElementById('sidebar-controls');
+
+            if (tabKey === 'sim') {
+                simView.style.display = 'flex';
+                lockedView.style.display = 'none';
+                sidebar.style.opacity = '1';
+                sidebar.style.pointerEvents = 'auto';
+            } else {
+                simView.style.display = 'none';
+                lockedView.style.display = 'flex';
+                sidebar.style.opacity = '0.3';
+                sidebar.style.pointerEvents = 'none';
+
+                const titles = { intel: 'HISTORICAL_TOKEN_INTELLIGENCE', order: 'HISTORICAL_AVG_ORDER_SIZE', buyer: 'HISTORICAL_BUYER_CONCENTRATION' };
+                document.getElementById('locked-title').innerText = titles[tabKey] || 'MODULE_LOCKED';
+            }
+        }
+
+        // Run simulation automatically when page loads
+        window.onload = () => { runSimulation(); };
+    </script>
+</body>
+</html>
