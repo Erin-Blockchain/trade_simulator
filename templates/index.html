@@ -176,10 +176,17 @@
             gap: 20px;
             flex-grow: 1;
             position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .container.centered-layout {
+            max-width: 1100px;
+            grid-template-columns: 1fr;
         }
 
         @media (max-width: 1024px) { 
             .container { grid-template-columns: 1fr; padding: 12px; } 
+            .container.centered-layout { max-width: 100%; }
         }
 
         /* --- Sidebar & Slide-in Drawer --- */
@@ -360,40 +367,40 @@
         }
         .chart-title { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 70px; }
 
-        /* Modal Overlay for Clickable Charts */
+        /* Modal Overlay for Clickable Charts (Centered, compact, perfectly fitted) */
         .chart-modal-overlay {
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(4, 6, 10, 0.9);
+            background: rgba(4, 6, 10, 0.85);
             backdrop-filter: blur(6px);
             z-index: 2000;
             align-items: center;
             justify-content: center;
-            padding: 16px;
+            padding: 12px;
         }
         .chart-modal-overlay.active { display: flex; }
         .chart-modal-content {
             background-color: var(--bg-card);
             border: 1px solid var(--neon-green);
             border-radius: 8px;
-            padding: 20px;
-            width: 100%;
-            max-width: 850px;
-            max-height: 90vh;
+            padding: 16px;
+            width: 92%;
+            max-width: 680px;
+            max-height: 85vh;
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            box-shadow: 0 0 40px rgba(0, 255, 136, 0.25);
+            gap: 10px;
+            box-shadow: 0 0 35px rgba(0, 255, 136, 0.25);
             position: relative;
         }
         .close-modal {
             position: absolute;
-            top: 14px; right: 16px;
+            top: 12px; right: 14px;
             background: transparent;
             border: none;
             color: var(--text-muted);
-            font-size: 18px;
+            font-size: 16px;
             cursor: pointer;
             font-family: var(--font-mono);
         }
@@ -401,8 +408,7 @@
         .modal-canvas-wrapper {
             position: relative;
             width: 100%;
-            height: 400px;
-            max-height: 65vh;
+            height: 260px;
         }
 
         /* Token Intel View Layout */
@@ -465,6 +471,15 @@
             color: var(--neon-green);
             font-family: var(--font-mono);
         }
+
+        /* Lock Screen Placeholder */
+        .locked-view {
+            display: none; background-color: var(--bg-card); border: 1px solid var(--border-color);
+            border-radius: 8px; padding: 60px 20px; text-align: center; flex-direction: column; align-items: center; justify-content: center; gap: 12px; width: 100%;
+        }
+        .locked-icon { font-size: 32px; margin-bottom: 8px; }
+        .locked-title { font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--neon-green); }
+        .locked-desc { color: var(--text-muted); max-width: 400px; font-size: 13px; }
     </style>
 </head>
 <body>
@@ -501,12 +516,12 @@
     </div>
 
     <!-- Main Container -->
-    <div class="container">
+    <div class="container" id="main-container">
         
         <!-- Sidebar Controls (Slide-in Drawer on Mobile) -->
         <div class="sidebar" id="sidebar-controls">
             <div class="sidebar-title">
-                <span>Parameters</span>
+                <span>Input Parameters</span>
                 <button class="close-drawer" onclick="toggleSidebar()">✕</button>
             </div>
             <div class="input-group">
@@ -627,6 +642,13 @@
                 </div>
             </div>
         </div>
+
+        <!-- Tool View: Locked Module Placeholder -->
+        <div class="main-content locked-view" id="view-locked">
+            <div class="locked-icon">⚔️</div>
+            <div class="locked-title" id="locked-title">MODULE_LOCKED</div>
+            <div class="locked-desc">Historical data indexing in progress. This Seekal tool will be available in the next deployment update.</div>
+        </div>
     </div>
 
     <!-- Logic Script -->
@@ -744,8 +766,8 @@
                     maintainAspectRatio: false, 
                     plugins: { legend: { display: false } }, 
                     scales: { 
-                        x: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: isModal ? 11 : 8 } }, grid: { display: false } }, 
-                        y: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: isModal ? 11 : 8 } }, grid: { color: '#162032' } } 
+                        x: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: isModal ? 10 : 8 } }, grid: { display: false } }, 
+                        y: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: isModal ? 10 : 8 } }, grid: { color: '#162032' } } 
                     } 
                 }
             });
@@ -765,14 +787,14 @@
 
             const chartObj = new Chart(ctx, {
                 type: 'line',
-                data: { labels: labels, datasets: [{ data: data, borderColor: '#26354f', borderWidth: isModal ? 3 : 2, pointBackgroundColor: pointColors, pointRadius: isModal ? 6 : 3 }] },
+                data: { labels: labels, datasets: [{ data: data, borderColor: '#26354f', borderWidth: isModal ? 3 : 2, pointBackgroundColor: pointColors, pointRadius: isModal ? 5 : 3 }] },
                 options: { 
                     responsive: true, 
                     maintainAspectRatio: false, 
                     plugins: { legend: { display: false } }, 
                     scales: { 
-                        x: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: isModal ? 11 : 8 } }, grid: { display: false } }, 
-                        y: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: isModal ? 11 : 8 } }, grid: { color: '#162032' } } 
+                        x: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: isModal ? 10 : 8 } }, grid: { display: false } }, 
+                        y: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: isModal ? 10 : 8 } }, grid: { color: '#162032' } } 
                     } 
                 }
             });
@@ -812,18 +834,29 @@
 
             const simView = document.getElementById('view-sim');
             const intelView = document.getElementById('view-intel');
+            const lockedView = document.getElementById('view-locked');
             const sidebar = document.getElementById('sidebar-controls');
+            const container = document.getElementById('main-container');
+
+            // Reset visibility
+            simView.style.display = 'none';
+            intelView.style.display = 'none';
+            lockedView.style.display = 'none';
 
             if (tabKey === 'sim') {
                 simView.style.display = 'flex';
-                intelView.style.display = 'none';
+                sidebar.style.display = 'flex';
                 sidebar.style.opacity = '1';
                 sidebar.style.pointerEvents = 'auto';
+                container.classList.remove('centered-layout');
             } else if (tabKey === 'intel') {
-                simView.style.display = 'none';
                 intelView.style.display = 'flex';
-                sidebar.style.opacity = '0.3';
-                sidebar.style.pointerEvents = 'none';
+                sidebar.style.display = 'none'; // Hide sidebar so Token Intel centers perfectly
+                container.classList.add('centered-layout');
+            } else {
+                lockedView.style.display = 'flex';
+                sidebar.style.display = 'none';
+                container.classList.add('centered-layout');
             }
         }
 
