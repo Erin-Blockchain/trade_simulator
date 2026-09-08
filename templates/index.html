@@ -165,15 +165,6 @@
             font-weight: 600;
         }
 
-        .tab-btn .badge-soon {
-            font-size: 9px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border-color);
-            color: var(--text-muted);
-            padding: 1px 4px;
-            border-radius: 3px;
-        }
-
         /* --- Main Layout Grid --- */
         .container {
             max-width: 1600px;
@@ -337,7 +328,7 @@
         .val-profit { color: var(--neon-green); font-weight: 600; }
         .val-loss { color: var(--neon-red); font-weight: 600; }
 
-        /* Charts Container: STRICTLY Side by Side across ALL screen sizes */
+        /* Charts Container: Side by side */
         .charts-grid { 
             display: grid; 
             grid-template-columns: 1fr 1fr; 
@@ -351,22 +342,145 @@
             padding: 10px; 
             min-width: 0; 
             width: 100%; 
+            cursor: pointer;
+            transition: border-color 0.2s, transform 0.2s;
+            position: relative;
         }
-        .chart-title { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .chart-box:hover {
+            border-color: var(--neon-green);
+        }
+        .chart-box::after {
+            content: '🔍 Tap to Expand';
+            position: absolute;
+            top: 8px; right: 10px;
+            font-family: var(--font-mono);
+            font-size: 8px;
+            color: var(--text-muted);
+            opacity: 0.7;
+        }
+        .chart-title { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 70px; }
 
-        /* Lock Screen Placeholder */
-        .locked-view {
-            display: none; background-color: var(--bg-card); border: 1px border-style var(--border-color);
-            border-radius: 8px; padding: 80px 20px; text-align: center; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+        /* Modal Overlay for Clickable Charts */
+        .chart-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(4, 6, 10, 0.9);
+            backdrop-filter: blur(6px);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
         }
-        .locked-icon { font-size: 32px; margin-bottom: 8px; }
-        .locked-title { font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--neon-green); }
-        .locked-desc { color: var(--text-muted); max-width: 400px; font-size: 13px; }
+        .chart-modal-overlay.active { display: flex; }
+        .chart-modal-content {
+            background-color: var(--bg-card);
+            border: 1px solid var(--neon-green);
+            border-radius: 8px;
+            padding: 20px;
+            width: 100%;
+            max-width: 850px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            box-shadow: 0 0 40px rgba(0, 255, 136, 0.25);
+            position: relative;
+        }
+        .close-modal {
+            position: absolute;
+            top: 14px; right: 16px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 18px;
+            cursor: pointer;
+            font-family: var(--font-mono);
+        }
+        .close-modal:hover { color: var(--neon-green); }
+        .modal-canvas-wrapper {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            max-height: 65vh;
+        }
+
+        /* Token Intel View Layout */
+        .intel-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            width: 100%;
+        }
+        .intel-hero {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .intel-hero-title {
+            font-family: var(--font-mono);
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--neon-green);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+        .intel-hero-desc {
+            color: var(--text-muted);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .intel-grid-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        @media (max-width: 768px) {
+            .intel-grid-cards { grid-template-columns: 1fr; }
+        }
+        .intel-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .intel-card-title {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--neon-cyan);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        .intel-feature-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-main);
+        }
+        .intel-feature-list li b {
+            color: var(--neon-green);
+            font-family: var(--font-mono);
+        }
     </style>
 </head>
 <body>
     <!-- Sidebar Backdrop Overlay for Mobile -->
     <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    <!-- Chart Modal Popup -->
+    <div class="chart-modal-overlay" id="chartModal" onclick="closeChartModal()">
+        <div class="chart-modal-content" onclick="event.stopPropagation()">
+            <button class="close-modal" onclick="closeChartModal()">✕</button>
+            <div class="chart-title" id="modal-chart-title" style="padding-right: 30px;">// EXPANDED VIEW</div>
+            <div class="modal-canvas-wrapper">
+                <canvas id="modalChart"></canvas>
+            </div>
+        </div>
+    </div>
 
     <!-- Header -->
     <header>
@@ -383,9 +497,7 @@
     <!-- Nav Tabs -->
     <div class="nav-tabs">
         <button class="tab-btn active" onclick="switchTab('sim')"><span>01</span> TRADE_SIMULATOR</button>
-        <button class="tab-btn" onclick="switchTab('intel')"><span>02</span> TOKEN_INTEL <span class="badge-soon">SOON</span></button>
-        <button class="tab-btn" onclick="switchTab('order')"><span>03</span> AVG_ORDER_SIZE <span class="badge-soon">SOON</span></button>
-        <button class="tab-btn" onclick="switchTab('buyer')"><span>04</span> BUYER_CONCENTRATION <span class="badge-soon">SOON</span></button>
+        <button class="tab-btn" onclick="switchTab('intel')"><span>02</span> TOKEN_INTEL</button>
     </div>
 
     <!-- Main Container -->
@@ -454,7 +566,7 @@
 
             <!-- Discrete Table (Positioned BEFORE Charts) -->
             <div class="table-box">
-                <div class="chart-title" style="margin-bottom: 8px;">// Discrete Outcome Probabilities</div>
+                <div class="chart-title" style="margin-bottom: 8px; padding-right: 0;">// Discrete Outcome Probabilities</div>
                 <table>
                     <thead>
                         <tr>
@@ -470,24 +582,50 @@
                 </table>
             </div>
 
-            <!-- Visual Charts (STRICTLY Side by Side) -->
+            <!-- Visual Charts (Side by Side, Clickable) -->
             <div class="charts-grid">
-                <div class="chart-box">
+                <div class="chart-box" onclick="openChartModal('bar')">
                     <div class="chart-title">// Probability Distribution</div>
                     <canvas id="barChart" height="150"></canvas>
                 </div>
-                <div class="chart-box">
+                <div class="chart-box" onclick="openChartModal('line')">
                     <div class="chart-title">// Total PnL vs Wins</div>
                     <canvas id="lineChart" height="150"></canvas>
                 </div>
             </div>
         </div>
 
-        <!-- Tool View: Placeholder -->
-        <div class="main-content locked-view" id="view-locked">
-            <div class="locked-icon">⚔️</div>
-            <div class="locked-title" id="locked-title">MODULE_LOCKED</div>
-            <div class="locked-desc">Historical data indexing in progress. This Seekal tool will be available in the next deployment update.</div>
+        <!-- Tool View: Token Intel -->
+        <div class="main-content" id="view-intel" style="display: none;">
+            <div class="intel-container">
+                <div class="intel-hero">
+                    <div class="intel-hero-title">HISTORICAL TOKEN INTELLIGENCE</div>
+                    <div class="intel-hero-desc">
+                        Uncover deep structural dynamics at <b>any exact historical timestamp</b> of a coin's lifespan. Real-time data feeds like GMGN or Dexscreener only display current states—Seekal lets you travel back to see what structural conditions preceded winning tokens.
+                    </div>
+                </div>
+
+                <div class="intel-grid-cards">
+                    <div class="intel-card">
+                        <div class="intel-card-title">🔍 Core Historical Metrics</div>
+                        <ul class="intel-feature-list">
+                            <li><b>Holders:</b> Trace exact wallet count evolution through launch phases.</li>
+                            <li><b>Top 10 Supply:</b> Audit concentration shifts before major price expansions.</li>
+                            <li><b>Dev Percentage:</b> Monitor insider/creator bag weights historically.</li>
+                            <li><b>Avg Order Size:</b> Identify retail FOMO vs early whale accumulation.</li>
+                            <li><b>Buyer Concentration:</b> Pinpoint distribution safety thresholds.</li>
+                        </ul>
+                    </div>
+                    <div class="intel-card">
+                        <div class="intel-card-title">⚡ Edge & Trading Impact</div>
+                        <ul class="intel-feature-list">
+                            <li><b>Filter Rugs Early:</b> Backtest your strategy against historical wallet patterns to avoid hidden dumps.</li>
+                            <li><b>Spot True Accumulation:</b> Distinguish organic holder growth from bot-driven wash trading.</li>
+                            <li><b>Optimize Entries:</b> Match setup rules with structural milestones proven by past winners.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -495,6 +633,9 @@
     <script>
         let barChartInstance = null;
         let lineChartInstance = null;
+        let modalChartInstance = null;
+        let globalOutcomes = [];
+        let globalTop2Wins = [];
 
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar-controls');
@@ -534,13 +675,15 @@
                 const evPerTrade = data.ev_per_trade;
                 const totalEv = data.total_ev;
                 const outcomes = data.outcomes;
+                globalOutcomes = outcomes;
+
                 const winRatePct = payload.win_rate;
                 const nTrades = payload.n_trades;
 
                 let sortedOutcomes = [...outcomes].sort((a, b) => b.prob - a.prob);
                 let top1 = sortedOutcomes[0];
                 let top2 = sortedOutcomes[1] || sortedOutcomes[0];
-                let top2Wins = [top1.wins, top2.wins];
+                globalTop2Wins = [top1.wins, top2.wins];
                 let combinedProb = top1.prob + (top1 !== top2 ? top2.prob : 0);
 
                 document.getElementById('res-ev').innerText = `$${evPerTrade.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
@@ -572,8 +715,8 @@
                     tbody.appendChild(tr);
                 });
 
-                renderBarChart(outcomes, top2Wins);
-                renderLineChart(outcomes);
+                renderBarChart(outcomes, globalTop2Wins, 'barChart');
+                renderLineChart(outcomes, 'lineChart');
 
             } catch (error) {
                 console.error("Simulation failed:", error);
@@ -584,34 +727,82 @@
             }
         }
 
-        function renderBarChart(outcomes, top2Wins) {
-            const ctx = document.getElementById('barChart').getContext('2d');
+        function renderBarChart(outcomes, top2Wins, canvasId, isModal = false) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
             const labels = outcomes.map(o => `${o.wins}W`);
             const data = outcomes.map(o => (o.prob * 100).toFixed(2));
             const bgColors = outcomes.map(o => top2Wins.includes(o.wins) ? '#00ff88' : '#162032');
 
-            if (barChartInstance) barChartInstance.destroy();
+            if (!isModal && barChartInstance) barChartInstance.destroy();
+            if (isModal && modalChartInstance) modalChartInstance.destroy();
 
-            barChartInstance = new Chart(ctx, {
+            const chartObj = new Chart(ctx, {
                 type: 'bar',
-                data: { labels: labels, datasets: [{ data: data, backgroundColor: bgColors, borderRadius: 3 }] },
-                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 8 } }, grid: { display: false } }, y: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 8 } }, grid: { color: '#162032' } } } }
+                data: { labels: labels, datasets: [{ data: data, backgroundColor: bgColors, borderRadius: isModal ? 6 : 3 }] },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { legend: { display: false } }, 
+                    scales: { 
+                        x: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: isModal ? 11 : 8 } }, grid: { display: false } }, 
+                        y: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: isModal ? 11 : 8 } }, grid: { color: '#162032' } } 
+                    } 
+                }
             });
+
+            if (isModal) modalChartInstance = chartObj;
+            else barChartInstance = chartObj;
         }
 
-        function renderLineChart(outcomes) {
-            const ctx = document.getElementById('lineChart').getContext('2d');
+        function renderLineChart(outcomes, canvasId, isModal = false) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
             const labels = outcomes.map(o => `${o.wins}W`);
             const data = outcomes.map(o => o.pnl);
             const pointColors = outcomes.map(o => o.pnl >= 0 ? '#00ff88' : '#ff3366');
 
-            if (lineChartInstance) lineChartInstance.destroy();
+            if (!isModal && lineChartInstance) lineChartInstance.destroy();
+            if (isModal && modalChartInstance) modalChartInstance.destroy();
 
-            lineChartInstance = new Chart(ctx, {
+            const chartObj = new Chart(ctx, {
                 type: 'line',
-                data: { labels: labels, datasets: [{ data: data, borderColor: '#26354f', borderWidth: 2, pointBackgroundColor: pointColors, pointRadius: 3 }] },
-                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 8 } }, grid: { display: false } }, y: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 8 } }, grid: { color: '#162032' } } } }
+                data: { labels: labels, datasets: [{ data: data, borderColor: '#26354f', borderWidth: isModal ? 3 : 2, pointBackgroundColor: pointColors, pointRadius: isModal ? 6 : 3 }] },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { legend: { display: false } }, 
+                    scales: { 
+                        x: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: isModal ? 11 : 8 } }, grid: { display: false } }, 
+                        y: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: isModal ? 11 : 8 } }, grid: { color: '#162032' } } 
+                    } 
+                }
             });
+
+            if (isModal) modalChartInstance = chartObj;
+            else lineChartInstance = chartObj;
+        }
+
+        function openChartModal(type) {
+            if (!globalOutcomes.length) return;
+            const modal = document.getElementById('chartModal');
+            modal.classList.add('active');
+            const titleEl = document.getElementById('modal-chart-title');
+
+            if (type === 'bar') {
+                titleEl.innerText = "// PROBABILITY DISTRIBUTION (EXPANDED)";
+                renderBarChart(globalOutcomes, globalTop2Wins, 'modalChart', true);
+            } else {
+                titleEl.innerText = "// TOTAL PNL VS WINS (EXPANDED)";
+                renderLineChart(globalOutcomes, 'modalChart', true);
+            }
+        }
+
+        function closeChartModal() {
+            const modal = document.getElementById('chartModal');
+            modal.classList.remove('active');
+            if (modalChartInstance) {
+                modalChartInstance.destroy();
+                modalChartInstance = null;
+            }
         }
 
         function switchTab(tabKey) {
@@ -620,22 +811,19 @@
             event.currentTarget.classList.add('active');
 
             const simView = document.getElementById('view-sim');
-            const lockedView = document.getElementById('view-locked');
+            const intelView = document.getElementById('view-intel');
             const sidebar = document.getElementById('sidebar-controls');
 
             if (tabKey === 'sim') {
                 simView.style.display = 'flex';
-                lockedView.style.display = 'none';
+                intelView.style.display = 'none';
                 sidebar.style.opacity = '1';
                 sidebar.style.pointerEvents = 'auto';
-            } else {
+            } else if (tabKey === 'intel') {
                 simView.style.display = 'none';
-                lockedView.style.display = 'flex';
+                intelView.style.display = 'flex';
                 sidebar.style.opacity = '0.3';
                 sidebar.style.pointerEvents = 'none';
-
-                const titles = { intel: 'HISTORICAL_TOKEN_INTELLIGENCE', order: 'HISTORICAL_AVG_ORDER_SIZE', buyer: 'HISTORICAL_BUYER_CONCENTRATION' };
-                document.getElementById('locked-title').innerText = titles[tabKey] || 'MODULE_LOCKED';
             }
         }
 
