@@ -359,16 +359,6 @@
             border-color: var(--neon-green);
             box-shadow: 0 0 15px rgba(0, 255, 136, 0.15);
         }
-        .chart-box::after {
-            content: '🔍 CLICK TO EXPAND';
-            position: absolute;
-            top: 10px;
-            right: 12px;
-            font-size: 8px;
-            font-family: var(--font-mono);
-            color: var(--text-muted);
-            opacity: 0.6;
-        }
         .chart-title { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         /* --- Clickable Chart Modal Popup (Fit-to-Screen) --- */
@@ -514,7 +504,7 @@
     <div class="chart-modal-overlay" id="chartModalOverlay" onclick="closeChartModal()">
         <div class="chart-modal-content" onclick="event.stopPropagation()">
             <div class="chart-modal-header">
-                <span id="modalChartTitle">// EXPANDED VIEW</span>
+                <span id="modalChartTitle">// CHART VIEW</span>
                 <button class="close-modal-btn" onclick="closeChartModal()">✕</button>
             </div>
             <div class="chart-modal-body">
@@ -535,7 +525,7 @@
         </div>
     </header>
 
-    <!-- Nav Tabs (Tab 3 and 4 removed) -->
+    <!-- Nav Tabs -->
     <div class="nav-tabs">
         <button class="tab-btn active" onclick="switchTab('sim')"><span>01</span> TRADE_SIMULATOR</button>
         <button class="tab-btn" onclick="switchTab('intel')"><span>02</span> TOKEN_INTEL <span class="badge-soon">SOON</span></button>
@@ -812,7 +802,7 @@
             if (modalChartInstance) modalChartInstance.destroy();
 
             if (chartType === 'bar') {
-                titleEl.innerText = "// Probability Distribution — Expanded View";
+                titleEl.innerText = "// PROBABILITY DISTRIBUTION";
                 const labels = outcomes.map(o => `${o.wins}W / ${o.losses}L`);
                 const data = outcomes.map(o => (o.prob * 100).toFixed(2));
                 const bgColors = outcomes.map(o => top2Wins.includes(o.wins) ? '#00ff88' : '#162032');
@@ -823,7 +813,7 @@
                     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 11 } }, grid: { display: false } }, y: { ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 11 } }, grid: { color: '#162032' } } } }
                 });
             } else {
-                titleEl.innerText = "// Total PnL vs Wins — Expanded View";
+                titleEl.innerText = "// TOTAL PNL VS WINS";
                 const labels = outcomes.map(o => `${o.wins}W / ${o.losses}L`);
                 const data = outcomes.map(o => o.pnl);
                 const pointColors = outcomes.map(o => o.pnl >= 0 ? '#00ff88' : '#ff3366');
