@@ -681,6 +681,24 @@
                      font-size:13px; margin-top:12px; display:none;"></div>
             </div>
 
+            <!-- Loading overlay: gif + accurate progress bar -->
+            <div id="intel-loading" style="margin-top:20px; display:none;">
+                <div class="intel-card" style="text-align:center;">
+                    <img src="{{ url_for('static', filename='loading.gif') }}"
+                         alt="Loading" style="max-width:320px; width:100%; border-radius:10px;">
+                    <div style="margin-top:14px; font-family:var(--font-mono); color:var(--text-muted);">
+                        <span id="intel-progress-label">Replaying blocks...</span>
+                        <b id="intel-progress-pct" style="color:var(--neon-green);">0%</b>
+                    </div>
+                    <div style="margin-top:10px; height:10px; background:#0d1424;
+                         border:1px solid var(--border,#1c2740); border-radius:6px; overflow:hidden;">
+                        <div id="intel-progress-bar" style="height:100%; width:0%;
+                             background:linear-gradient(90deg,#22e39a,#22c9e3);
+                             transition:width 0.4s ease;"></div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Intel Results -->
             <div id="intel-results" class="intel-grid-cards" style="margin-top:20px; display:none;">
                 <div class="intel-card">
@@ -714,6 +732,15 @@
                 </div>
             </div>
 
+            <!-- Paid version note -->
+            <div id="intel-paid-note" style="margin-top:16px; padding:14px 18px;
+                 border:1px dashed var(--neon-green,#22e39a); border-radius:10px;
+                 background:rgba(34,227,154,0.05); font-family:var(--font-mono);
+                 font-size:13px; color:var(--text-muted); text-align:center;">
+                ⚡ <b style="color:var(--neon-green);">Seekal Pro</b> — lightning-fast
+                processing (results in seconds, not minutes) is <b style="color:var(--neon-green);">coming soon</b>.
+            </div>
+
         </div>
     </div>
 
@@ -736,6 +763,9 @@
             const btn = document.getElementById('intel-btn');
             const errBox = document.getElementById('intel-error');
             const results = document.getElementById('intel-results');
+            const loading = document.getElementById('intel-loading');
+            const bar = document.getElementById('intel-progress-bar');
+            const pctLabel = document.getElementById('intel-progress-pct');
             const token = (document.getElementById('intel-token').value || '').trim();
             const age = parseFloat(document.getElementById('intel-age').value) || 15;
             const unit = document.getElementById('intel-unit').value || 'min';
@@ -748,7 +778,19 @@
                 return;
             }
 
+            // 1. RESET: clear the previous run's results and progress before starting
+            results.style.display = 'none';
+            bar.style.width = '0%';
+            pctLabel.innerText = '0%';
+            loading.style.display = '';          // 3. show the loading gif + bar
             btn.disabled = true;
+            btn.innerText = 'PROCESSING...';
+
+            function setProgress(pct) {
+                const p = Math.max(0, Math.min(100, Math.round(pct)));
+                bar.style.width = p + '%';
+                pctLabel.innerText = p + '%';
+            }
 
             async function poll() {
                 try {
@@ -757,13 +799,14 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ token: token, age: age, unit: unit, chain: chain })
                     });
-
                     const d = await resp.json();
 
                     if (resp.status === 202 || d.status === "processing") {
-                        btn.innerText = d.message || "Replaying blocks...";
-                        setTimeout(poll, 3000);
+                        // 2. ACCURATE progress from the backend (real chunk count)
+                        if (typeof d.progress === 'number') setProgress(d.progress);
+                        setTimeout(poll, 2000);
                     } else if (resp.ok && !d.error) {
+                        setProgress(100);
                         const money = (v) => '$' + (v ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
                         document.getElementById('intel-at-age').innerText = age;
                         document.getElementById('intel-at-unit').innerText = (unit === 'hour') ? 'hr' : 'min';
@@ -776,22 +819,28 @@
                         document.getElementById('r-tblock').innerText = d.target_block ?? '-';
                         document.getElementById('r-agenow').innerText = d.coin_age_now_min ?? '-';
                         document.getElementById('r-note').innerText = d.note || '';
-                        results.style.display = '';
 
-                        btn.disabled = false;
-                        btn.innerText = "Get Intelligence ↵";
+                        // small delay so the bar visibly reaches 100% before swap
+                        setTimeout(() => {
+                            loading.style.display = 'none';
+                            results.style.display = '';
+                            btn.disabled = false;
+                            btn.innerText = 'Get Intelligence ↵';
+                        }, 300);
                     } else {
+                        loading.style.display = 'none';
                         errBox.innerText = 'Error: ' + (d.error || `Server Error: ${resp.status}`);
                         errBox.style.display = 'block';
                         results.style.display = 'none';
                         btn.disabled = false;
-                        btn.innerText = "Get Intelligence ↵";
+                        btn.innerText = 'Get Intelligence ↵';
                     }
                 } catch (e) {
+                    loading.style.display = 'none';
                     errBox.innerText = 'Network error: ' + e;
                     errBox.style.display = 'block';
                     btn.disabled = false;
-                    btn.innerText = "Get Intelligence ↵";
+                    btn.innerText = 'Get Intelligence ↵';
                 }
             }
 

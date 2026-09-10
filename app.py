@@ -110,14 +110,16 @@ def _find_launch(token):
     return None, None, None
 
 
-def _avg_order_sizes(token, curve, lblock, target, lt, ts, qscale, qprice):
+def _avg_order_sizes(token, curve, lblock, target, lt, ts, qscale, qprice, rpc=None):
     """Return (avg_buy_usd, avg_sell_usd, n_buys, n_sells) using pre-fetched metadata."""
+    rpc = rpc or _rpc_solid
+
     class _Const(dict):
         def __init__(self, v): self._v = v
         def get(self, *_a, **_k): return self._v
-        
+
     rows = CS.build_stitched_once(
-        _rpc_solid, token, curve, lblock, target,
+        rpc, token, curve, lblock, target,
         block_times=_Const(ts), quote_price=lambda t: qprice,
         quote_scale=qscale, supply=1_000_000_000, log_chunk=10000,
         pause=0.0, launched=lt)
@@ -152,7 +154,9 @@ def intel():
 
         # 2. If a background job is actively running, tell the frontend to keep waiting
         if job_key in JOB_STORE and JOB_STORE[job_key].get("status") == "processing":
-            return jsonify({"status": "processing", "message": "Historical replay in progress..."}), 202
+            return jsonify({"status": "processing",
+                            "progress": JOB_STORE[job_key].get("progress", 0),
+                            "message": "Historical replay in progress..."}), 202
 
         # 3. If a previous run failed, clear it and return the error
         if job_key in JOB_STORE and JOB_STORE[job_key].get("status") == "error":
@@ -168,7 +172,7 @@ def intel():
             return jsonify({"error": "Age must be greater than 0."}), 400
 
         # 4. Mark as processing and launch background thread
-        JOB_STORE[job_key] = {"status": "processing"}
+        JOB_STORE[job_key] = {"status": "processing", "progress": 0}
 
         def run_background_job():
             try:
@@ -186,10 +190,32 @@ def intel():
                 coin_age_now_min = (tip - lblock) / BLOCKS_PER_SEC / 60.0
                 capped = (lblock + int(age_min * 60 * BLOCKS_PER_SEC)) > tip
 
+                # --- real progress tracking -------------------------------
+                # Two log-replays run (holders + swaps) over the same block
+                # span, each in 10000-block chunks. Total getLogs ~= 2 * chunks.
+                CHUNK = 10000
+                span = max(1, target - lblock)
+                total_calls = max(1, 2 * math.ceil(span / CHUNK))
+                counter = {"done": 0}
+
+                def progress_rpc(payload):
+                    r = _rpc_solid(payload)
+                    # count only the eth_getLogs range reads (the slow part)
+                    try:
+                        if payload.get("method") == "eth_getLogs":
+                            counter["done"] += 1
+                            pct = min(99, int(counter["done"] / total_calls * 100))
+                            job = JOB_STORE.get(job_key, {})
+                            if job.get("status") == "processing":
+                                job["progress"] = pct
+                    except Exception:
+                        pass
+                    return r
+
                 with ThreadPoolExecutor(max_workers=3) as executor:
                     future_feats = executor.submit(
-                        HF.compute, _rpc_solid, token, curve, deployer,
-                        P.PONS_FACTORIES[0][1], lblock, target, log_chunk=10000
+                        HF.compute, progress_rpc, token, curve, deployer,
+                        P.PONS_FACTORIES[0][1], lblock, target, log_chunk=CHUNK
                     )
                     future_lt = executor.submit(CS.launched_token, _rpc_solid, token)
                     lt = future_lt.result() or {}
@@ -207,7 +233,8 @@ def intel():
                     qscale, qprice, _, _ = executor.submit(CS.resolve_quote, _rpc_solid, pair, eth, ts=ts).result()
 
                     future_swaps = executor.submit(
-                        _avg_order_sizes, token, curve, lblock, target, lt, ts, qscale, qprice
+                        _avg_order_sizes, token, curve, lblock, target, lt, ts, qscale, qprice,
+                        progress_rpc
                     )
 
                     try:
