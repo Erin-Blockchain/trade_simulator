@@ -186,6 +186,10 @@
             flex-grow: 1;
             position: relative;
         }
+        /* when the sim sidebar is hidden (Token Intel tab), use the full width */
+        .container.no-sidebar {
+            grid-template-columns: 1fr;
+        }
 
         @media (max-width: 1024px) { 
             .container { grid-template-columns: 1fr; padding: 12px; } 
@@ -659,11 +663,140 @@
                 </div>
             </div>
 
+            <!-- Intel input form -->
+            <div class="intel-hero-card" style="margin-top:20px;">
+                <div class="intel-card-title" style="margin-bottom:16px;">🔎 Query Historical Snapshot</div>
+                <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
+                    <div class="input-group" style="flex:1; min-width:150px;">
+                        <label>Chain</label>
+                        <select id="intel-chain" style="padding:10px; border-radius:8px;
+                            background:var(--bg-input,#0d1424); color:var(--text-light,#e6ecf5);
+                            border:1px solid var(--border,#1c2740); font-family:var(--font-mono);">
+                            <option value="robinhood" selected>Robinhood Chain</option>
+                        </select>
+                    </div>
+                    <div class="input-group" style="flex:2; min-width:260px;">
+                        <label>Token Address</label>
+                        <input type="text" id="intel-token" placeholder="0x..." autocomplete="off">
+                    </div>
+                    <div class="input-group" style="flex:1; min-width:120px;">
+                        <label>Coin Age</label>
+                        <input type="number" id="intel-age" value="15" step="1" min="1">
+                    </div>
+                    <div class="input-group" style="flex:1; min-width:110px;">
+                        <label>Unit</label>
+                        <select id="intel-unit" style="padding:10px; border-radius:8px;
+                            background:var(--bg-input,#0d1424); color:var(--text-light,#e6ecf5);
+                            border:1px solid var(--border,#1c2740); font-family:var(--font-mono);">
+                            <option value="min" selected>Minutes</option>
+                            <option value="hour">Hours</option>
+                        </select>
+                    </div>
+                    <button class="btn-primary" id="intel-btn" onclick="runIntel()"
+                            style="min-width:160px;">Get Intelligence ↵</button>
+                </div>
+                <div id="intel-error" style="color:#ff5a6e; font-family:var(--font-mono);
+                     font-size:13px; margin-top:12px; display:none;"></div>
+            </div>
+
+            <!-- Intel results -->
+            <div id="intel-results" class="intel-grid-cards" style="margin-top:20px; display:none;">
+                <div class="intel-card">
+                    <div class="intel-card-title">📊 Snapshot at <span id="intel-at-age">15</span> <span id="intel-at-unit">min</span></div>
+                    <div style="font-family:var(--font-mono); font-size:14px; line-height:2.2;">
+                        <div style="display:flex; justify-content:space-between;">
+                            <span style="color:var(--text-muted);">Holders</span>
+                            <b id="r-holders" style="color:var(--neon-green);">-</b></div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span style="color:var(--text-muted);">Top 10 Supply</span>
+                            <b id="r-top10" style="color:var(--neon-green);">-</b></div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span style="color:var(--text-muted);">Dev Holding</span>
+                            <b id="r-dev" style="color:var(--neon-green);">-</b></div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span style="color:var(--text-muted);">Avg Buy Size</span>
+                            <b id="r-avgbuy" style="color:var(--neon-green);">-</b></div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span style="color:var(--text-muted);">Avg Sell Size</span>
+                            <b id="r-avgsell" style="color:#ff5a6e;">-</b></div>
+                    </div>
+                </div>
+                <div class="intel-card">
+                    <div class="intel-card-title">🧭 Context</div>
+                    <div style="font-family:var(--font-mono); font-size:13px; line-height:2.2; color:var(--text-muted);">
+                        <div>Launch block: <b id="r-lblock" style="color:var(--text-light);">-</b></div>
+                        <div>Snapshot block: <b id="r-tblock" style="color:var(--text-light);">-</b></div>
+                        <div>Current coin age: <b id="r-agenow" style="color:var(--text-light);">-</b> min</div>
+                        <div id="r-note" style="color:#ffd166; margin-top:8px;"></div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
     <!-- Logic Script -->
     <script>
+        async function runIntel() {
+            const btn = document.getElementById('intel-btn');
+            const errBox = document.getElementById('intel-error');
+            const results = document.getElementById('intel-results');
+            const token = (document.getElementById('intel-token').value || '').trim();
+            const age = parseFloat(document.getElementById('intel-age').value) || 15;
+            const unit = document.getElementById('intel-unit').value || 'min';
+            const chain = document.getElementById('intel-chain').value || 'robinhood';
+
+            errBox.style.display = 'none';
+            if (!/^0x[0-9a-fA-F]{40}$/.test(token)) {
+                errBox.innerText = 'Enter a valid token address (0x + 40 hex).';
+                errBox.style.display = 'block';
+                return;
+            }
+
+            const original = btn.innerText;
+            btn.innerText = 'QUERYING...';
+            btn.style.opacity = '0.7';
+            btn.disabled = true;
+
+            try {
+                const resp = await fetch('/api/intel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: token, age: age, unit: unit, chain: chain })
+                });
+                const d = await resp.json();
+                if (!resp.ok) {
+                    errBox.innerText = d.error || 'Request failed.';
+                    errBox.style.display = 'block';
+                    results.style.display = 'none';
+                    return;
+                }
+                const money = (v) => '$' + (v ?? 0).toLocaleString(undefined,
+                    { maximumFractionDigits: 2 });
+                document.getElementById('intel-at-age').innerText = age;
+                document.getElementById('intel-at-unit').innerText = (unit === 'hour') ? 'hr' : 'min';
+                document.getElementById('r-holders').innerText = (d.holders ?? 0).toLocaleString();
+                document.getElementById('r-top10').innerText = (d.top10_pct ?? 0).toFixed(2) + '%';
+                document.getElementById('r-dev').innerText = (d.dev_pct ?? 0).toFixed(2) + '%';
+                document.getElementById('r-avgbuy').innerText = money(d.avg_buy_usd) +
+                    ' (' + (d.n_buys ?? 0) + ')';
+                document.getElementById('r-avgsell').innerText = money(d.avg_sell_usd) +
+                    ' (' + (d.n_sells ?? 0) + ')';
+                document.getElementById('r-lblock').innerText = d.launch_block ?? '-';
+                document.getElementById('r-tblock').innerText = d.target_block ?? '-';
+                document.getElementById('r-agenow').innerText = d.coin_age_now_min ?? '-';
+                document.getElementById('r-note').innerText = d.note || '';
+                results.style.display = '';
+            } catch (e) {
+                errBox.innerText = 'Network error: ' + e;
+                errBox.style.display = 'block';
+            } finally {
+                btn.innerText = original;
+                btn.style.opacity = '1';
+                btn.disabled = false;
+            }
+        }
+
         let barChartInstance = null;
         let lineChartInstance = null;
         let modalChartInstance = null;
@@ -676,13 +809,13 @@
             overlay.classList.toggle('active');
         }
 
-        async function runSimulation() {
+        async function runSimulation(userInitiated = true) {
             const btn = document.getElementById('sim-btn');
             const originalText = btn.innerText;
             btn.innerText = "CALCULATING...";
             btn.style.opacity = "0.7";
 
-            if (window.innerWidth <= 1024) {
+            if (userInitiated && window.innerWidth <= 1024) {
                 toggleSidebar();
             }
 
@@ -843,21 +976,24 @@
             const simView = document.getElementById('view-sim');
             const intelView = document.getElementById('view-intel');
             const sidebar = document.getElementById('sidebar-controls');
+            const container = document.querySelector('.container');
 
             if (tabKey === 'sim') {
                 simView.style.display = 'flex';
                 intelView.style.display = 'none';
+                sidebar.style.display = '';        // restore (flex column on desktop)
                 sidebar.style.opacity = '1';
                 sidebar.style.pointerEvents = 'auto';
+                container.classList.remove('no-sidebar');   // back to 320px + 1fr
             } else if (tabKey === 'intel') {
                 simView.style.display = 'none';
                 intelView.style.display = 'flex';
-                sidebar.style.opacity = '0.3';
-                sidebar.style.pointerEvents = 'none';
+                sidebar.style.display = 'none';     // hide the sim params entirely
+                container.classList.add('no-sidebar');      // content uses full width
             }
         }
 
-        window.onload = () => { runSimulation(); };
+        window.onload = () => { runSimulation(false); };
     </script>
 </body>
 </html>
