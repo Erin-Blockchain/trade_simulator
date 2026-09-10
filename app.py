@@ -7,8 +7,6 @@ from concurrent.futures import ThreadPoolExecutor
 import rh_pipeline as P
 import rh_holder_features as HF
 import rh_curve_swaps as CS
-import threading
-from concurrent.futures import ThreadPoolExecutor
 
 # Tracks background job states: {job_id: {"status": "processing"|"completed"|"error", "result": {...}}}
 JOB_STORE = {}
@@ -132,6 +130,7 @@ def _avg_order_sizes(token, curve, lblock, target, lt, ts, qscale, qprice):
     avg_sell = (sell_vol / n_sells) if n_sells else 0.0
     return avg_buy, avg_sell, n_buys, n_sells
 
+
 @app.route('/api/intel', methods=['POST'])
 def intel():
     try:
@@ -253,107 +252,6 @@ def intel():
         import traceback
         traceback.print_exc()
         return jsonify({"error": f"Server error: {type(e).__name__}: {str(e)[:200]}"}), 500
-def _intel_impl():
-    data = request.json or {}
-    token = (data.get('token') or '').strip().lower()
-    chain = (data.get('chain') or 'robinhood').lower()
-    unit = (data.get('unit') or 'min').lower()      
-    try:
-        age = float(data.get('age', 15))
-    except (TypeError, ValueError):
-        age = 15.0
-
-    age_min = age * 60 if unit in ('hour', 'hours', 'hr', 'h') else age
-
-    if chain not in ('robinhood',):
-        return jsonify({"error": f"Chain '{chain}' not supported yet."}), 400
-    if not (token.startswith('0x') and len(token) == 42):
-        return jsonify({"error": "Enter a valid token address (0x + 40 hex)."}), 400
-    if age_min <= 0:
-        return jsonify({"error": "Age must be greater than 0."}), 400
-
-    feats = {}
-    avg_buy = avg_sell = 0.0
-    n_buys = n_sells = 0
-
-    from concurrent.futures import ThreadPoolExecutor
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        # 1. Fetch block data, block tips, and token info simultaneously
-        future_launch = executor.submit(_find_launch, token)
-        future_tip = executor.submit(P.latest_block)
-        future_lt = executor.submit(CS.launched_token, _rpc_solid, token)
-
-        try:
-            lblock, curve, deployer = future_launch.result()
-        except Exception as e:
-            return jsonify({"error": f"RPC error while locating launch: {str(e)[:120]}"}), 502
-
-        if lblock is None:
-            return jsonify({"error": "Launch event not found for this token (not a pons token, or too old)."}), 404
-
-        tip = future_tip.result()
-        target = min(lblock + int(age_min * 60 * BLOCKS_PER_SEC), tip)
-        coin_age_now_min = (tip - lblock) / BLOCKS_PER_SEC / 60.0
-        capped = (lblock + int(age_min * 60 * BLOCKS_PER_SEC)) > tip
-
-        # 2. Kick off the heavy holder replay task immediately to overlap with dependent API calls
-        future_feats = executor.submit(
-            HF.compute, _rpc_solid, token, curve, deployer,
-            P.PONS_FACTORIES[0][1], lblock, target, log_chunk=10000
-        )
-
-        # 3. Resolve interdependent swap metadata sequentially but concurrently to HF.compute
-        # Resolve interdependent swap metadata concurrently
-        lt = future_lt.result() or {}
-        pair = (lt.get("pairToken") or CS.NATIVE).lower()
-
-        # Fire both block timestamp requests at the same time
-        future_ts_target = executor.submit(P.block_timestamp, target)
-        future_ts_lblock = executor.submit(P.block_timestamp, lblock)
-        ts = future_ts_target.result() or future_ts_lblock.result()
-
-        try:
-            eth = P.eth_usd(ts) if hasattr(P, "eth_usd") else 1920.0
-        except Exception:
-            eth = 1920.0
-
-        qscale, qprice, _, _ = executor.submit(CS.resolve_quote, _rpc_solid, pair, eth, ts=ts).result()
-
-        # 4. Perform the swap loops with pre-fetched metadata
-        future_swaps = executor.submit(
-            _avg_order_sizes, token, curve, lblock, target, lt, ts, qscale, qprice
-        )
-
-        try:
-            avg_buy, avg_sell, n_buys, n_sells = future_swaps.result()
-        except Exception as e:
-            print(f"Error computing order sizes: {e}")
-
-        try:
-            feats = future_feats.result() or {}
-        except Exception as e:
-            print(f"RPC error during holder replay: {e}")
-
-    out = {
-        "token": token,
-        "unit": unit,
-        "age": age,
-        "age_min": age_min,
-        "launch_block": lblock,
-        "target_block": target,
-        "coin_age_now_min": round(coin_age_now_min, 1),
-        "holders": feats.get("holders", 0),
-        "top10_pct": feats.get("top10_pct", 0.0),
-        "dev_pct": feats.get("dev_pct", 0.0),
-        "avg_buy_usd": round(avg_buy, 2),
-        "avg_sell_usd": round(avg_sell, 2),
-        "n_buys": n_buys,
-        "n_sells": n_sells,
-    }
-    if capped:
-        out["note"] = (f"Coin is only {coin_age_now_min:.1f} min old; showing "
-                       f"data at its current age.")
-    return jsonify(out)
 
 
 if __name__ == '__main__':
