@@ -165,15 +165,6 @@
             font-weight: 600;
         }
 
-        .tab-btn .badge-soon {
-            font-size: 9px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border-color);
-            color: var(--text-muted);
-            padding: 1px 4px;
-            border-radius: 3px;
-        }
-
         /* --- Main Layout Grid --- */
         .container {
             max-width: 1600px;
@@ -186,7 +177,6 @@
             flex-grow: 1;
             position: relative;
         }
-        /* when the sim sidebar is hidden (Token Intel tab), use the full width */
         .container.no-sidebar {
             grid-template-columns: 1fr;
         }
@@ -295,7 +285,6 @@
         /* --- Main Content Area --- */
         .main-content { display: flex; flex-direction: column; gap: 14px; min-width: 0; width: 100%; }
         
-        /* Metrics Grid */
         .metrics-grid { 
             display: grid; 
             grid-template-columns: repeat(3, 1fr); 
@@ -321,7 +310,6 @@
         .metric-card.cyan .metric-value { color: var(--neon-cyan); }
         .metric-card.pink .metric-value { color: var(--neon-pink); }
 
-        /* Insight Card */
         .insight-card {
             background: linear-gradient(135deg, rgba(9, 13, 22, 0.9), rgba(15, 22, 36, 0.9));
             border: 1px solid var(--neon-green);
@@ -332,7 +320,6 @@
         .insight-title { color: var(--neon-green); font-family: var(--font-mono); font-weight: 700; font-size: 13px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
         .insight-text { color: var(--text-main); font-size: 12px; line-height: 1.4; }
 
-        /* Table placed before charts */
         .table-box { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; overflow-x: auto; width: 100%; }
         table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 11px; text-align: left; }
         th { color: var(--text-muted); padding: 6px; border-bottom: 1px solid var(--border-color); font-weight: 600; font-size: 9px; text-transform: uppercase; }
@@ -341,7 +328,6 @@
         .val-profit { color: var(--neon-green); font-weight: 600; }
         .val-loss { color: var(--neon-red); font-weight: 600; }
 
-        /* Charts Container */
         .charts-grid { 
             display: grid; 
             grid-template-columns: 1fr 1fr; 
@@ -365,7 +351,7 @@
         }
         .chart-title { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-        /* --- Clickable Chart Modal Popup (Fit-to-Screen) --- */
+        /* --- Clickable Chart Modal Popup --- */
         .chart-modal-overlay {
             display: none;
             position: fixed;
@@ -538,7 +524,7 @@
     <!-- Main Container -->
     <div class="container">
         
-        <!-- Sidebar Controls (Slide-in Drawer on Mobile) -->
+        <!-- Sidebar Controls -->
         <div class="sidebar" id="sidebar-controls">
             <div class="sidebar-title">
                 <span>Parameters</span>
@@ -567,10 +553,9 @@
             <button class="btn-primary" id="sim-btn" onclick="runSimulation()">Run Simulation ↵</button>
         </div>
 
-        <!-- Tool View: Simulator (Active) -->
+        <!-- Tool View: Simulator -->
         <div class="main-content" id="view-sim">
             
-            <!-- Input Parameters Button (Mobile Only) -->
             <button class="mobile-params-btn" onclick="toggleSidebar()">
                 ⚙ INPUT PARAMETERS
             </button>
@@ -612,12 +597,11 @@
                         </tr>
                     </thead>
                     <tbody id="outcomes-table-body">
-                        <!-- Populated by JS -->
                     </tbody>
                 </table>
             </div>
 
-            <!-- Visual Charts (Clickable) -->
+            <!-- Visual Charts -->
             <div class="charts-grid">
                 <div class="chart-box" onclick="openChartModal('bar')">
                     <div class="chart-title">// Probability Distribution</div>
@@ -633,7 +617,6 @@
         <!-- Tool View: Token Intel -->
         <div class="main-content" id="view-intel" style="display: none;">
             
-            <!-- Shifted Hero Description -->
             <div class="intel-hero-card">
                 <div class="intel-hero-title">⚡ SEEKAL // HISTORICAL TOKEN INTELLIGENCE</div>
                 <div class="intel-hero-desc">
@@ -641,7 +624,6 @@
                 </div>
             </div>
 
-            <!-- Grid Cards for Core Metrics & Trading Impact -->
             <div class="intel-grid-cards">
                 <div class="intel-card">
                     <div class="intel-card-title">🔍 Core Historical Metrics</div>
@@ -663,15 +645,15 @@
                 </div>
             </div>
 
-            <!-- Intel input form -->
+            <!-- Intel Input Form -->
             <div class="intel-hero-card" style="margin-top:20px;">
                 <div class="intel-card-title" style="margin-bottom:16px;">🔎 Query Historical Snapshot</div>
                 <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
                     <div class="input-group" style="flex:1; min-width:150px;">
                         <label>Chain</label>
                         <select id="intel-chain" style="padding:10px; border-radius:8px;
-                            background:var(--bg-input,#0d1424); color:var(--text-light,#e6ecf5);
-                            border:1px solid var(--border,#1c2740); font-family:var(--font-mono);">
+                            background:#0d1424; color:#e6ecf5;
+                            border:1px solid #1c2740; font-family:var(--font-mono);">
                             <option value="robinhood" selected>Robinhood Chain</option>
                         </select>
                     </div>
@@ -686,8 +668,8 @@
                     <div class="input-group" style="flex:1; min-width:110px;">
                         <label>Unit</label>
                         <select id="intel-unit" style="padding:10px; border-radius:8px;
-                            background:var(--bg-input,#0d1424); color:var(--text-light,#e6ecf5);
-                            border:1px solid var(--border,#1c2740); font-family:var(--font-mono);">
+                            background:#0d1424; color:#e6ecf5;
+                            border:1px solid #1c2740; font-family:var(--font-mono);">
                             <option value="min" selected>Minutes</option>
                             <option value="hour">Hours</option>
                         </select>
@@ -699,7 +681,7 @@
                      font-size:13px; margin-top:12px; display:none;"></div>
             </div>
 
-            <!-- Intel results -->
+            <!-- Intel Results -->
             <div id="intel-results" class="intel-grid-cards" style="margin-top:20px; display:none;">
                 <div class="intel-card">
                     <div class="intel-card-title">📊 Snapshot at <span id="intel-at-age">15</span> <span id="intel-at-unit">min</span></div>
@@ -724,9 +706,9 @@
                 <div class="intel-card">
                     <div class="intel-card-title">🧭 Context</div>
                     <div style="font-family:var(--font-mono); font-size:13px; line-height:2.2; color:var(--text-muted);">
-                        <div>Launch block: <b id="r-lblock" style="color:var(--text-light);">-</b></div>
-                        <div>Snapshot block: <b id="r-tblock" style="color:var(--text-light);">-</b></div>
-                        <div>Current coin age: <b id="r-agenow" style="color:var(--text-light);">-</b> min</div>
+                        <div>Launch block: <b id="r-lblock" style="color:#e2e8f0;">-</b></div>
+                        <div>Snapshot block: <b id="r-tblock" style="color:#e2e8f0;">-</b></div>
+                        <div>Current coin age: <b id="r-agenow" style="color:#e2e8f0;">-</b> min</div>
                         <div id="r-note" style="color:#ffd166; margin-top:8px;"></div>
                     </div>
                 </div>
@@ -737,6 +719,19 @@
 
     <!-- Logic Script -->
     <script>
+        // Global Chart & State Instances
+        let barChartInstance = null;
+        let lineChartInstance = null;
+        let modalChartInstance = null;
+        let lastSimulationData = null;
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar-controls');
+            const overlay = document.getElementById('sidebar-overlay');
+            if (sidebar) sidebar.classList.toggle('open');
+            if (overlay) overlay.classList.toggle('active');
+        }
+
         async function runIntel() {
             const btn = document.getElementById('intel-btn');
             const errBox = document.getElementById('intel-error');
@@ -767,7 +762,7 @@
 
                     if (resp.status === 202 || d.status === "processing") {
                         btn.innerText = d.message || "Replaying blocks...";
-                        setTimeout(poll, 3000); // Re-check every 3 seconds
+                        setTimeout(poll, 3000);
                     } else if (resp.ok && !d.error) {
                         const money = (v) => '$' + (v ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
                         document.getElementById('intel-at-age').innerText = age;
@@ -884,46 +879,6 @@
                 btn.style.opacity = "1";
             }
         }
-        async function handleGetIntelligence() {
-            const token = document.getElementById('tokenInput').value;
-            const age = document.getElementById('ageInput').value;
-            const unit = document.getElementById('unitInput').value;
-            const chain = document.getElementById('chainInput').value;
-
-            const submitBtn = document.getElementById('getIntelBtn');
-            submitBtn.disabled = true;
-            submitBtn.innerText = "Auditing Historical Blocks...";
-
-            async function poll() {
-                try {
-                    const response = await fetch('/api/intel', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ token, age, unit, chain })
-                    });
-
-                    const data = await response.json();
-
-                    if (response.status === 202 || data.status === "processing") {
-                        submitBtn.innerText = data.message || "Replaying blocks...";
-                        setTimeout(poll, 3000); // Re-check every 3 seconds
-                    } else if (response.status === 200 && !data.error) {
-                        renderMetrics(data); // Call your existing rendering function
-                        submitBtn.disabled = false;
-                        submitBtn.innerText = "GET INTELLIGENCE";
-                    } else {
-                        alert("Error: " + (data.error || "Unknown server error"));
-                        submitBtn.disabled = false;
-                        submitBtn.innerText = "GET INTELLIGENCE";
-                    }
-                } catch (err) {
-                    console.error("Polling network glitch, retrying...", err);
-                    setTimeout(poll, 3000);
-                }
-            }
-
-            poll();
-        }
 
         function renderBarChart(outcomes, top2Wins) {
             const ctx = document.getElementById('barChart').getContext('2d');
@@ -1016,15 +971,15 @@
             if (tabKey === 'sim') {
                 simView.style.display = 'flex';
                 intelView.style.display = 'none';
-                sidebar.style.display = '';        // restore (flex column on desktop)
+                sidebar.style.display = '';
                 sidebar.style.opacity = '1';
                 sidebar.style.pointerEvents = 'auto';
-                container.classList.remove('no-sidebar');   // back to 320px + 1fr
+                container.classList.remove('no-sidebar');
             } else if (tabKey === 'intel') {
                 simView.style.display = 'none';
                 intelView.style.display = 'flex';
-                sidebar.style.display = 'none';     // hide the sim params entirely
-                container.classList.add('no-sidebar');      // content uses full width
+                sidebar.style.display = 'none';
+                container.classList.add('no-sidebar');
             }
         }
 
