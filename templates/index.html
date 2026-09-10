@@ -753,63 +753,54 @@
                 return;
             }
 
-            const original = btn.innerText;
-            btn.innerText = 'QUERYING...';
-            btn.style.opacity = '0.7';
             btn.disabled = true;
 
-            try {
-                const resp = await fetch('/api/intel', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token: token, age: age, unit: unit, chain: chain })
-                });
+            async function poll() {
+                try {
+                    const resp = await fetch('/api/intel', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token: token, age: age, unit: unit, chain: chain })
+                    });
 
-                // Evaluate the HTTP status BEFORE trying to parse the body as JSON
-                if (!resp.ok) {
-                    errBox.innerText = `Server Error: ${resp.status}`;
+                    const d = await resp.json();
+
+                    if (resp.status === 202 || d.status === "processing") {
+                        btn.innerText = d.message || "Replaying blocks...";
+                        setTimeout(poll, 3000); // Re-check every 3 seconds
+                    } else if (resp.ok && !d.error) {
+                        const money = (v) => '$' + (v ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+                        document.getElementById('intel-at-age').innerText = age;
+                        document.getElementById('intel-at-unit').innerText = (unit === 'hour') ? 'hr' : 'min';
+                        document.getElementById('r-holders').innerText = (d.holders ?? 0).toLocaleString();
+                        document.getElementById('r-top10').innerText = (d.top10_pct ?? 0).toFixed(2) + '%';
+                        document.getElementById('r-dev').innerText = (d.dev_pct ?? 0).toFixed(2) + '%';
+                        document.getElementById('r-avgbuy').innerText = money(d.avg_buy_usd) + ' (' + (d.n_buys ?? 0) + ')';
+                        document.getElementById('r-avgsell').innerText = money(d.avg_sell_usd) + ' (' + (d.n_sells ?? 0) + ')';
+                        document.getElementById('r-lblock').innerText = d.launch_block ?? '-';
+                        document.getElementById('r-tblock').innerText = d.target_block ?? '-';
+                        document.getElementById('r-agenow').innerText = d.coin_age_now_min ?? '-';
+                        document.getElementById('r-note').innerText = d.note || '';
+                        results.style.display = '';
+
+                        btn.disabled = false;
+                        btn.innerText = "Get Intelligence ↵";
+                    } else {
+                        errBox.innerText = 'Error: ' + (d.error || `Server Error: ${resp.status}`);
+                        errBox.style.display = 'block';
+                        results.style.display = 'none';
+                        btn.disabled = false;
+                        btn.innerText = "Get Intelligence ↵";
+                    }
+                } catch (e) {
+                    errBox.innerText = 'Network error: ' + e;
                     errBox.style.display = 'block';
-                    results.style.display = 'none';
-                    return;
+                    btn.disabled = false;
+                    btn.innerText = "Get Intelligence ↵";
                 }
-                const d = await resp.json();
-                
-                const money = (v) => '$' + (v ?? 0).toLocaleString(undefined,
-                    { maximumFractionDigits: 2 });
-                document.getElementById('intel-at-age').innerText = age;
-                document.getElementById('intel-at-unit').innerText = (unit === 'hour') ? 'hr' : 'min';
-                document.getElementById('r-holders').innerText = (d.holders ?? 0).toLocaleString();
-                document.getElementById('r-top10').innerText = (d.top10_pct ?? 0).toFixed(2) + '%';
-                document.getElementById('r-dev').innerText = (d.dev_pct ?? 0).toFixed(2) + '%';
-                document.getElementById('r-avgbuy').innerText = money(d.avg_buy_usd) +
-                    ' (' + (d.n_buys ?? 0) + ')';
-                document.getElementById('r-avgsell').innerText = money(d.avg_sell_usd) +
-                    ' (' + (d.n_sells ?? 0) + ')';
-                document.getElementById('r-lblock').innerText = d.launch_block ?? '-';
-                document.getElementById('r-tblock').innerText = d.target_block ?? '-';
-                document.getElementById('r-agenow').innerText = d.coin_age_now_min ?? '-';
-                document.getElementById('r-note').innerText = d.note || '';
-                results.style.display = '';
-            } catch (e) {
-                errBox.innerText = 'Network error: ' + e;
-                errBox.style.display = 'block';
-            } finally {
-                btn.innerText = original;
-                btn.style.opacity = '1';
-                btn.disabled = false;
             }
-        }
 
-        let barChartInstance = null;
-        let lineChartInstance = null;
-        let modalChartInstance = null;
-        let lastSimulationData = null;
-
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar-controls');
-            const overlay = document.getElementById('sidebar-overlay');
-            sidebar.classList.toggle('open');
-            overlay.classList.toggle('active');
+            poll();
         }
 
         async function runSimulation(userInitiated = true) {
@@ -892,6 +883,46 @@
                 btn.innerText = originalText;
                 btn.style.opacity = "1";
             }
+        }
+        async function handleGetIntelligence() {
+            const token = document.getElementById('tokenInput').value;
+            const age = document.getElementById('ageInput').value;
+            const unit = document.getElementById('unitInput').value;
+            const chain = document.getElementById('chainInput').value;
+
+            const submitBtn = document.getElementById('getIntelBtn');
+            submitBtn.disabled = true;
+            submitBtn.innerText = "Auditing Historical Blocks...";
+
+            async function poll() {
+                try {
+                    const response = await fetch('/api/intel', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token, age, unit, chain })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.status === 202 || data.status === "processing") {
+                        submitBtn.innerText = data.message || "Replaying blocks...";
+                        setTimeout(poll, 3000); // Re-check every 3 seconds
+                    } else if (response.status === 200 && !data.error) {
+                        renderMetrics(data); // Call your existing rendering function
+                        submitBtn.disabled = false;
+                        submitBtn.innerText = "GET INTELLIGENCE";
+                    } else {
+                        alert("Error: " + (data.error || "Unknown server error"));
+                        submitBtn.disabled = false;
+                        submitBtn.innerText = "GET INTELLIGENCE";
+                    }
+                } catch (err) {
+                    console.error("Polling network glitch, retrying...", err);
+                    setTimeout(poll, 3000);
+                }
+            }
+
+            poll();
         }
 
         function renderBarChart(outcomes, top2Wins) {
