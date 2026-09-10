@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 import math
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 # token-intelligence backend (Transfer-replay + swap read, validated vs GMGN)
 import rh_pipeline as P
@@ -182,21 +183,31 @@ def _intel_impl():
     coin_age_now_min = (tip - lblock) / BLOCKS_PER_SEC / 60.0
     capped = (lblock + int(age_min * 60 * BLOCKS_PER_SEC)) > tip
 
-    # holder features (holders, top10, dev) — drop burnt
-    try:
-        feats = HF.compute(_rpc_solid, token, curve, deployer,
-                           P.PONS_FACTORIES[0][1], lblock, target, log_chunk=10000) or {}
-    except Exception as e:                                  # noqa: BLE001
-        return jsonify({"error": f"RPC error during holder replay: "
-                                 f"{str(e)[:120]}"}), 502
+    # --- START REPLACEMENT ---
+    feats = {}
+    avg_buy = avg_sell = 0.0
+    n_buys = n_sells = 0
 
-    # avg buy / sell order size from the swap rows
-    try:
-        avg_buy, avg_sell, n_buys, n_sells = _avg_order_sizes(
-            token, curve, lblock, target)
-    except Exception as e:                                  # noqa: BLE001
-        avg_buy = avg_sell = 0.0
-        n_buys = n_sells = 0
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_feats = executor.submit(
+            HF.compute, _rpc_solid, token, curve, deployer,
+            P.PONS_FACTORIES[0][1], lblock, target, log_chunk=10000
+        )
+        future_swaps = executor.submit(
+            _avg_order_sizes, token, curve, lblock, target
+        )
+
+        try:
+            feats = future_feats.result() or {}
+        except Exception as e:
+            print(f"RPC error during holder replay: {e}")
+
+        try:
+            avg_buy, avg_sell, n_buys, n_sells = future_swaps.result()
+        except Exception as e:
+            print(f"Error computing order sizes: {e}")
+    # --- END REPLACEMENT ---
 
     out = {
         "token": token,
