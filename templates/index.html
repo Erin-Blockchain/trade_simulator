@@ -758,6 +758,7 @@
             btn.style.opacity = '0.7';
             btn.disabled = true;
 
+            try {
                 const resp = await fetch('/api/intel', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
