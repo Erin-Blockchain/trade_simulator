@@ -531,8 +531,8 @@
 
     <!-- Nav Tabs -->
     <div class="nav-tabs">
-        <button class="tab-btn active" onclick="switchTab('sim')"><span>01</span> TRADE_SIMULATOR</button>
-        <button class="tab-btn" onclick="switchTab('intel')"><span>02</span> TOKEN_INTEL <span class="badge-soon">SOON</span></button>
+        <button class="tab-btn active" onclick="switchTab('sim', event)"><span>01</span> TRADE_SIMULATOR</button>
+        <button class="tab-btn" onclick="switchTab('intel', event)"><span>02</span> TOKEN_INTEL</button>
     </div>
 
     <!-- Main Container -->
@@ -970,10 +970,11 @@
             }
         }
 
-        function switchTab(tabKey) {
+        function switchTab(tabKey, ev) {
             const buttons = document.querySelectorAll('.tab-btn');
             buttons.forEach(btn => btn.classList.remove('active'));
-            event.currentTarget.classList.add('active');
+            const target = (ev && ev.currentTarget) || (window.event && window.event.currentTarget);
+            if (target) target.classList.add('active');
 
             const simView = document.getElementById('view-sim');
             const intelView = document.getElementById('view-intel');
