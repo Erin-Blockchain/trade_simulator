@@ -160,7 +160,7 @@ def _intel_impl():
     n_buys = n_sells = 0
 
     from concurrent.futures import ThreadPoolExecutor
-    with ThreadPoolExecutor(max_workers=6) as executor:
+    with ThreadPoolExecutor(max_workers=3) as executor:
         # 1. Fetch block data, block tips, and token info simultaneously
         future_launch = executor.submit(_find_launch, token)
         future_tip = executor.submit(P.latest_block)
