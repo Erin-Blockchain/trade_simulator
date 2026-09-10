@@ -31,12 +31,13 @@ def home():
 
 @app.route('/api/simulate', methods=['POST'])
 def simulate():
-    data = request.json
+    data = request.json or {}  # <--- Add "or {}" here to prevent crashes
     capital = float(data.get('capital', 100))
     sl_pct = float(data.get('sl_pct', 70))
     tp_mult = float(data.get('tp_mult', 10))
     win_rate_pct = float(data.get('win_rate', 66.66))
     n_trades = int(data.get('n_trades', 10))
+    # ... rest of the simulate function
 
     p = win_rate_pct / 100.0
     loss_amount = -1.0 * capital * (sl_pct / 100.0)
