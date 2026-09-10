@@ -107,22 +107,12 @@ def _find_launch(token):
     return None, None, None
 
 
-def _avg_order_sizes(token, curve, lblock, target):
-    """Return (avg_buy_usd, avg_sell_usd, n_buys, n_sells) over
-    [lblock, target] from the curve/v4 swap rows. USD per side."""
-    lt = CS.launched_token(_rpc_solid, token) or {}
-    pair = (lt.get("pairToken") or CS.NATIVE).lower()
-    ts = P.block_timestamp(target) or P.block_timestamp(lblock)
-    # eth price at the window (for native pairs); resolve_quote uses it
-    try:
-        eth = P.eth_usd(ts) if hasattr(P, "eth_usd") else 1920.0
-    except Exception:
-        eth = 1920.0
-    qscale, qprice, _, _ = CS.resolve_quote(_rpc_solid, pair, eth, ts=ts)
-
+def _avg_order_sizes(token, curve, lblock, target, lt, ts, qscale, qprice):
+    """Return (avg_buy_usd, avg_sell_usd, n_buys, n_sells) using pre-fetched metadata."""
     class _Const(dict):
         def __init__(self, v): self._v = v
         def get(self, *_a, **_k): return self._v
+        
     rows = CS.build_stitched_once(
         _rpc_solid, token, curve, lblock, target,
         block_times=_Const(ts), quote_price=lambda t: qprice,
@@ -138,28 +128,16 @@ def _avg_order_sizes(token, curve, lblock, target):
     return avg_buy, avg_sell, n_buys, n_sells
 
 
-@app.route('/api/intel', methods=['POST'])
-def intel():
-    try:
-        return _intel_impl()
-    except Exception as e:                              # noqa: BLE001
-        import traceback
-        traceback.print_exc()      # full traceback to the server console
-        return jsonify({"error": f"Server error: {type(e).__name__}: "
-                                 f"{str(e)[:200]}"}), 500
-
-
 def _intel_impl():
     data = request.json or {}
     token = (data.get('token') or '').strip().lower()
     chain = (data.get('chain') or 'robinhood').lower()
-    unit = (data.get('unit') or 'min').lower()      # 'min' (default) or 'hour'
+    unit = (data.get('unit') or 'min').lower()      
     try:
         age = float(data.get('age', 15))
     except (TypeError, ValueError):
         age = 15.0
 
-    # normalise age to minutes
     age_min = age * 60 if unit in ('hour', 'hours', 'hr', 'h') else age
 
     if chain not in ('robinhood',):
@@ -169,45 +147,67 @@ def _intel_impl():
     if age_min <= 0:
         return jsonify({"error": "Age must be greater than 0."}), 400
 
-    try:
-        lblock, curve, deployer = _find_launch(token)
-    except Exception as e:                                  # noqa: BLE001
-        return jsonify({"error": f"RPC error while locating launch: "
-                                 f"{str(e)[:120]}"}), 502
-    if lblock is None:
-        return jsonify({"error": "Launch event not found for this token "
-                                 "(not a pons token, or too old)."}), 404
-
-    tip = P.latest_block()
-    target = min(lblock + int(age_min * 60 * BLOCKS_PER_SEC), tip)
-    coin_age_now_min = (tip - lblock) / BLOCKS_PER_SEC / 60.0
-    capped = (lblock + int(age_min * 60 * BLOCKS_PER_SEC)) > tip
-
-    # --- START REPLACEMENT ---
     feats = {}
     avg_buy = avg_sell = 0.0
     n_buys = n_sells = 0
 
     from concurrent.futures import ThreadPoolExecutor
-    with ThreadPoolExecutor(max_workers=2) as executor:
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        # 1. Fetch block data, block tips, and token info simultaneously
+        future_launch = executor.submit(_find_launch, token)
+        future_tip = executor.submit(P.latest_block)
+        future_lt = executor.submit(CS.launched_token, _rpc_solid, token)
+
+        try:
+            lblock, curve, deployer = future_launch.result()
+        except Exception as e:
+            return jsonify({"error": f"RPC error while locating launch: {str(e)[:120]}"}), 502
+
+        if lblock is None:
+            return jsonify({"error": "Launch event not found for this token (not a pons token, or too old)."}), 404
+
+        tip = future_tip.result()
+        target = min(lblock + int(age_min * 60 * BLOCKS_PER_SEC), tip)
+        coin_age_now_min = (tip - lblock) / BLOCKS_PER_SEC / 60.0
+        capped = (lblock + int(age_min * 60 * BLOCKS_PER_SEC)) > tip
+
+        # 2. Kick off the heavy holder replay task immediately to overlap with dependent API calls
         future_feats = executor.submit(
             HF.compute, _rpc_solid, token, curve, deployer,
             P.PONS_FACTORIES[0][1], lblock, target, log_chunk=10000
         )
-        future_swaps = executor.submit(
-            _avg_order_sizes, token, curve, lblock, target
-        )
+
+        # 3. Resolve interdependent swap metadata sequentially but concurrently to HF.compute
+        # Resolve interdependent swap metadata concurrently
+        lt = future_lt.result() or {}
+        pair = (lt.get("pairToken") or CS.NATIVE).lower()
+
+        # Fire both block timestamp requests at the same time
+        future_ts_target = executor.submit(P.block_timestamp, target)
+        future_ts_lblock = executor.submit(P.block_timestamp, lblock)
+        ts = future_ts_target.result() or future_ts_lblock.result()
 
         try:
-            feats = future_feats.result() or {}
-        except Exception as e:
-            print(f"RPC error during holder replay: {e}")
+            eth = P.eth_usd(ts) if hasattr(P, "eth_usd") else 1920.0
+        except Exception:
+            eth = 1920.0
+
+        qscale, qprice, _, _ = executor.submit(CS.resolve_quote, _rpc_solid, pair, eth, ts=ts).result()
+
+        # 4. Perform the swap loops with pre-fetched metadata
+        future_swaps = executor.submit(
+            _avg_order_sizes, token, curve, lblock, target, lt, ts, qscale, qprice
+        )
 
         try:
             avg_buy, avg_sell, n_buys, n_sells = future_swaps.result()
         except Exception as e:
             print(f"Error computing order sizes: {e}")
-    # --- END REPLACEMENT ---
+
+        try:
+            feats = future_feats.result() or {}
+        except Exception as e:
+            print(f"RPC error during holder replay: {e}")
 
     out = {
         "token": token,
