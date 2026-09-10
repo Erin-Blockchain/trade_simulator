@@ -681,20 +681,20 @@
                      font-size:13px; margin-top:12px; display:none;"></div>
             </div>
 
-            <!-- Loading overlay: gif + accurate progress bar -->
+            <!-- Loading overlay: centered gif + smooth time-estimate bar -->
             <div id="intel-loading" style="margin-top:20px; display:none;">
-                <div class="intel-card" style="text-align:center;">
+                <div class="intel-card" style="display:flex; flex-direction:column; align-items:center; text-align:center;">
                     <img src="{{ url_for('static', filename='loading.gif') }}"
-                         alt="Loading" style="max-width:320px; width:100%; border-radius:10px;">
+                         alt="Loading" style="max-width:320px; width:100%; border-radius:10px; margin:0 auto;">
                     <div style="margin-top:14px; font-family:var(--font-mono); color:var(--text-muted);">
                         <span id="intel-progress-label">Replaying blocks...</span>
                         <b id="intel-progress-pct" style="color:var(--neon-green);">0%</b>
                     </div>
-                    <div style="margin-top:10px; height:10px; background:#0d1424;
+                    <div style="margin-top:10px; width:100%; max-width:420px; height:10px; background:#0d1424;
                          border:1px solid var(--border,#1c2740); border-radius:6px; overflow:hidden;">
                         <div id="intel-progress-bar" style="height:100%; width:0%;
                              background:linear-gradient(90deg,#22e39a,#22c9e3);
-                             transition:width 0.4s ease;"></div>
+                             transition:width 0.5s linear;"></div>
                     </div>
                 </div>
             </div>
@@ -786,10 +786,29 @@
             btn.disabled = true;
             btn.innerText = 'PROCESSING...';
 
-            function setProgress(pct) {
-                const p = Math.max(0, Math.min(100, Math.round(pct)));
-                bar.style.width = p + '%';
-                pctLabel.innerText = p + '%';
+            // 2. TIME-ESTIMATE progress: estimate how long the replay takes from
+            // the age requested (bigger window = more blocks = longer), then
+            // climb the bar SMOOTHLY and MONOTONICALLY toward 95%. It never
+            // jumps backward. When the real result lands, snap to 100%.
+            const ageMinutes = (unit === 'hour') ? age * 60 : age;
+            // ~1.1s per 15-min-of-coin-life window of scanning, min 6s, cap 90s
+            const estSeconds = Math.min(90, Math.max(6, (ageMinutes / 15) * 1.1 + 3));
+            let elapsed = 0;
+            let shown = 0;
+            const tick = 400;   // ms
+            const timer = setInterval(() => {
+                elapsed += tick / 1000;
+                // asymptotic approach to 95% — fast at first, slows near the end
+                const target = 95 * (1 - Math.exp(-elapsed / (estSeconds / 3)));
+                if (target > shown) shown = target;      // monotonic: never go back
+                bar.style.width = shown.toFixed(1) + '%';
+                pctLabel.innerText = Math.round(shown) + '%';
+            }, tick);
+
+            function finish() {
+                clearInterval(timer);
+                bar.style.width = '100%';
+                pctLabel.innerText = '100%';
             }
 
             async function poll() {
@@ -802,11 +821,10 @@
                     const d = await resp.json();
 
                     if (resp.status === 202 || d.status === "processing") {
-                        // 2. ACCURATE progress from the backend (real chunk count)
-                        if (typeof d.progress === 'number') setProgress(d.progress);
+                        // backend still working — the time-estimate bar keeps climbing
                         setTimeout(poll, 2000);
                     } else if (resp.ok && !d.error) {
-                        setProgress(100);
+                        finish();
                         const money = (v) => '$' + (v ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
                         document.getElementById('intel-at-age').innerText = age;
                         document.getElementById('intel-at-unit').innerText = (unit === 'hour') ? 'hr' : 'min';
@@ -819,15 +837,14 @@
                         document.getElementById('r-tblock').innerText = d.target_block ?? '-';
                         document.getElementById('r-agenow').innerText = d.coin_age_now_min ?? '-';
                         document.getElementById('r-note').innerText = d.note || '';
-
-                        // small delay so the bar visibly reaches 100% before swap
                         setTimeout(() => {
                             loading.style.display = 'none';
                             results.style.display = '';
                             btn.disabled = false;
                             btn.innerText = 'Get Intelligence ↵';
-                        }, 300);
+                        }, 350);
                     } else {
+                        clearInterval(timer);
                         loading.style.display = 'none';
                         errBox.innerText = 'Error: ' + (d.error || `Server Error: ${resp.status}`);
                         errBox.style.display = 'block';
@@ -836,6 +853,7 @@
                         btn.innerText = 'Get Intelligence ↵';
                     }
                 } catch (e) {
+                    clearInterval(timer);
                     loading.style.display = 'none';
                     errBox.innerText = 'Network error: ' + e;
                     errBox.style.display = 'block';
