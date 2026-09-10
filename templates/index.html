@@ -758,19 +758,21 @@
             btn.style.opacity = '0.7';
             btn.disabled = true;
 
-            try {
                 const resp = await fetch('/api/intel', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ token: token, age: age, unit: unit, chain: chain })
                 });
-                const d = await resp.json();
+
+                // Evaluate the HTTP status BEFORE trying to parse the body as JSON
                 if (!resp.ok) {
-                    errBox.innerText = d.error || 'Request failed.';
+                    errBox.innerText = `Server Error: ${resp.status}`;
                     errBox.style.display = 'block';
                     results.style.display = 'none';
                     return;
                 }
+                const d = await resp.json();
+                
                 const money = (v) => '$' + (v ?? 0).toLocaleString(undefined,
                     { maximumFractionDigits: 2 });
                 document.getElementById('intel-at-age').innerText = age;

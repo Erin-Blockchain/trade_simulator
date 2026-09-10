@@ -139,6 +139,16 @@ def _avg_order_sizes(token, curve, lblock, target):
 
 @app.route('/api/intel', methods=['POST'])
 def intel():
+    try:
+        return _intel_impl()
+    except Exception as e:                              # noqa: BLE001
+        import traceback
+        traceback.print_exc()      # full traceback to the server console
+        return jsonify({"error": f"Server error: {type(e).__name__}: "
+                                 f"{str(e)[:200]}"}), 500
+
+
+def _intel_impl():
     data = request.json or {}
     token = (data.get('token') or '').strip().lower()
     chain = (data.get('chain') or 'robinhood').lower()
