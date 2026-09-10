@@ -125,7 +125,7 @@ def _avg_order_sizes(token, curve, lblock, target):
     rows = CS.build_stitched_once(
         _rpc_solid, token, curve, lblock, target,
         block_times=_Const(ts), quote_price=lambda t: qprice,
-        quote_scale=qscale, supply=1_000_000_000, log_chunk=2500,
+        quote_scale=qscale, supply=1_000_000_000, log_chunk=10000,
         pause=0.0, launched=lt)
 
     buy_vol = sum(r["quote_usd"] for r in rows if r["side"] == "buy")
@@ -185,7 +185,7 @@ def _intel_impl():
     # holder features (holders, top10, dev) — drop burnt
     try:
         feats = HF.compute(_rpc_solid, token, curve, deployer,
-                           P.PONS_FACTORIES[0][1], lblock, target) or {}
+                           P.PONS_FACTORIES[0][1], lblock, target, log_chunk=10000) or {}
     except Exception as e:                                  # noqa: BLE001
         return jsonify({"error": f"RPC error during holder replay: "
                                  f"{str(e)[:120]}"}), 502
