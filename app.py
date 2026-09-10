@@ -7,7 +7,12 @@ from concurrent.futures import ThreadPoolExecutor
 import rh_pipeline as P
 import rh_holder_features as HF
 import rh_curve_swaps as CS
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
+# Tracks background job states: {job_id: {"status": "processing"|"completed"|"error", "result": {...}}}
+JOB_STORE = {}
+worker_executor = ThreadPoolExecutor(max_workers=2)
 app = Flask(__name__)
 
 BLOCKS_PER_SEC = 10
@@ -129,13 +134,34 @@ def _avg_order_sizes(token, curve, lblock, target, lt, ts, qscale, qprice):
 
 @app.route('/api/intel', methods=['POST'])
 def intel():
-    try:
-        return _intel_impl()
-    except Exception as e:                              # noqa: BLE001
-        import traceback
-        traceback.print_exc()      # full traceback to the server console
-        return jsonify({"error": f"Server error: {type(e).__name__}: "
-                                 f"{str(e)[:200]}"}), 500
+    data = request.json or {}
+    token = (data.get('token') or '').strip().lower()
+    age_min = float(data.get('age', 15))
+    
+    # Create a unique key for this token + window combination
+    job_key = f"{token}_{age_min}"
+    
+    # If already cached or completed, return it instantly
+    if job_key in JOB_STORE and JOB_STORE[job_key].get("status") == "completed":
+        return jsonify(JOB_STORE[job_key]["result"])
+        
+    # If a background job is already running for this, let the frontend know to wait
+    if job_key in JOB_STORE and JOB_STORE[job_key].get("status") == "processing":
+        return jsonify({"status": "processing", "message": "Historical replay in progress..."}), 202
+
+    # Otherwise, spin up the background worker
+    JOB_STORE[job_key] = {"status": "processing"}
+    
+    def background_task():
+        try:
+            # Run your heavy _intel_impl logic here safely
+            result = _intel_computation_logic(token, age_min)
+            JOB_STORE[job_key] = {"status": "completed", "result": result}
+        except Exception as e:
+            JOB_STORE[job_key] = {"status": "error", "message": str(e)}
+
+    worker_executor.submit(background_task)
+    return jsonify({"status": "processing", "message": "Scan initiated in background."}), 202
 def _intel_impl():
     data = request.json or {}
     token = (data.get('token') or '').strip().lower()
