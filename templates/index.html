@@ -678,7 +678,7 @@
                      font-size:13px; margin-top:12px; display:none;"></div>
             </div>
 
-            <!-- Loading overlay: centered gif + smooth time-estimate bar -->
+            <!-- Loading overlay: centered gif + smooth time-estimate bar + Stop button -->
             <div id="intel-loading" style="margin-top:20px; display:none;">
                 <div class="intel-card" style="display:flex; flex-direction:column; align-items:center; text-align:center;">
                     <img src="{{ url_for('static', filename='loading.gif') }}"
@@ -693,8 +693,14 @@
                              background:linear-gradient(90deg,#22e39a,#22c9e3);
                              transition:width 0.5s linear;"></div>
                     </div>
+                    <!-- Stop Button -->
+                    <button type="button" onclick="stopIntelQuery()" style="margin-top:16px; background:rgba(255,51,102,0.1); border:1px solid var(--neon-red); color:var(--neon-red); font-family:var(--font-mono); font-size:12px; font-weight:700; padding:8px 16px; border-radius:6px; cursor:pointer;">
+                        ✕ STOP QUERY
+                    </button>
                 </div>
             </div>
+
+            
 
             <!-- Intel Results -->
             <div id="intel-results" class="intel-grid-cards" style="margin-top:20px; display:none;">
@@ -756,6 +762,26 @@
             if (overlay) overlay.classList.toggle('active');
         }
 
+        // --- NEW INTEL STOP AND RUN LOGIC ---
+        let activeController = null;
+        let activeTimer = null;
+        let isCancelled = false;
+
+        function stopIntelQuery() {
+            isCancelled = true;
+            if (activeController) {
+                activeController.abort();
+            }
+            if (activeTimer) {
+                clearInterval(activeTimer);
+            }
+            
+            document.getElementById('intel-loading').style.display = 'none';
+            const btn = document.getElementById('intel-btn');
+            btn.disabled = false;
+            btn.innerText = 'Get Intelligence ↵';
+        }
+
         async function runIntel() {
             const btn = document.getElementById('intel-btn');
             const errBox = document.getElementById('intel-error');
@@ -775,41 +801,50 @@
                 return;
             }
 
-            // 1. RESET: clear the previous run's results and progress before starting
+            // Reset states
+            isCancelled = false;
             results.style.display = 'none';
             bar.style.width = '0%';
             pctLabel.innerText = '0%';
-            loading.style.display = '';          // show the loading gif + bar
+            loading.style.display = '';
             btn.disabled = true;
             btn.innerText = 'PROCESSING...';
 
-            // 2. TIME-ESTIMATE progress
+            // Time-estimate progress timer
             const ageMinutes = (unit === 'hour') ? age * 60 : age;
             const estSeconds = Math.min(90, Math.max(6, (ageMinutes / 15) * 1.1 + 3));
             let elapsed = 0;
             let shown = 0;
-            const tick = 400;   // ms
-            const timer = setInterval(() => {
+            const tick = 400;
+            
+            activeTimer = setInterval(() => {
+                if (isCancelled) return;
                 elapsed += tick / 1000;
                 const target = 95 * (1 - Math.exp(-elapsed / (estSeconds / 3)));
-                if (target > shown) shown = target;      // monotonic: never go back
+                if (target > shown) shown = target;
                 bar.style.width = shown.toFixed(1) + '%';
                 pctLabel.innerText = Math.round(shown) + '%';
             }, tick);
 
             function finish() {
-                clearInterval(timer);
+                if (activeTimer) clearInterval(activeTimer);
                 bar.style.width = '100%';
                 pctLabel.innerText = '100%';
             }
 
             async function poll() {
+                if (isCancelled) return;
+
+                activeController = new AbortController();
                 try {
                     const resp = await fetch('/api/intel', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ token: token, age: age, unit: unit, chain: chain })
+                        body: JSON.stringify({ token: token, age: age, unit: unit, chain: chain }),
+                        signal: activeController.signal
                     });
+                    
+                    if (isCancelled) return;
                     const d = await resp.json();
 
                     if (resp.status === 202 || d.status === "processing") {
@@ -828,6 +863,7 @@
                         document.getElementById('r-tblock').innerText = d.target_block ?? '-';
                         document.getElementById('r-agenow').innerText = d.coin_age_now_min ?? '-';
                         document.getElementById('r-note').innerText = d.note || '';
+                        
                         setTimeout(() => {
                             loading.style.display = 'none';
                             results.style.display = '';
@@ -835,7 +871,7 @@
                             btn.innerText = 'Get Intelligence ↵';
                         }, 350);
                     } else {
-                        clearInterval(timer);
+                        if (activeTimer) clearInterval(activeTimer);
                         loading.style.display = 'none';
                         errBox.innerText = 'Error: ' + (d.error || `Server Error: ${resp.status}`);
                         errBox.style.display = 'block';
@@ -844,7 +880,8 @@
                         btn.innerText = 'Get Intelligence ↵';
                     }
                 } catch (e) {
-                    clearInterval(timer);
+                    if (e.name === 'AbortError' || isCancelled) return; // Ignore intentional cancellation aborts
+                    if (activeTimer) clearInterval(activeTimer);
                     loading.style.display = 'none';
                     errBox.innerText = 'Network error: ' + e;
                     errBox.style.display = 'block';
