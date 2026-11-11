@@ -90,6 +90,21 @@ def home():
     return render_template('index.html', articles=_research_index())
 
 
+@app.route('/robots.txt')
+def robots():
+    body = "User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: https://seekal.fun/sitemap.xml\n"
+    return app.response_class(body, mimetype="text/plain")
+
+
+@app.route('/sitemap.xml')
+def sitemap():
+    urls = ["https://seekal.fun/"] + [f"https://seekal.fun/research/{a['slug']}" for a in _research_index()]
+    body = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            + "".join(f"  <url><loc>{u}</loc></url>\n" for u in urls) + "</urlset>\n")
+    return app.response_class(body, mimetype="application/xml")
+
+
 @app.route('/research/<slug>')
 def research_article(slug):
     arts = _research_index()

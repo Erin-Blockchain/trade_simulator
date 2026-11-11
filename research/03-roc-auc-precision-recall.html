@@ -2,12 +2,12 @@
 <p>The solution is not to search for one magic metric. It is to understand what each metric measures and connect it to the decision the model is intended to support.</p>
 <h2>Precision: how many selected cases were positive?</h2>
 <p>Precision answers: among all observations the model predicted as positive, what fraction were truly positive?</p>
-<p>[\text{Precision}=\frac{TP}{TP+FP}]</p>
+<div class="math">\[\text{Precision}=\frac{TP}{TP+FP}\]</div>
 <p>If a model selects 40 candidates and 20 meet the positive label, precision is 50%. The other 20 are false positives. Precision is useful when every selected candidate requires attention or when false positives are costly.</p>
 <p>But precision alone is incomplete. A model that selects only one highly confident case and gets it right has 100% precision, yet it may miss almost every positive opportunity in the dataset.</p>
 <h2>Recall: how many positive cases did the model find?</h2>
 <p>Recall answers: among all truly positive observations, what fraction did the model identify?</p>
-<p>[\text{Recall}=\frac{TP}{TP+FN}]</p>
+<div class="math">\[\text{Recall}=\frac{TP}{TP+FN}\]</div>
 <p>A model with high recall catches more positive cases, but it may also select many false positives. Precision and recall usually trade off as the threshold changes.</p>
 <p>For a candidate-screening system, the right balance depends on how the candidate list will be used. A small research team might prefer a shorter, more precise list. A broad discovery process may accept lower precision to avoid missing too many positive labels. The metric must follow the use case.</p>
 <h2>ROC-AUC: how well does the model rank?</h2>

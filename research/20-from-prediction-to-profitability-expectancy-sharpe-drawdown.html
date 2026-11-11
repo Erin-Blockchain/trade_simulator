@@ -5,13 +5,13 @@
 <p>Do not let the model use information that arrives after the decision timestamp. Do not assume a trade could be entered at a candle's low or exited at its high unless the data and execution model support that assumption. The backtest must represent an implementable sequence, not an idealised path through the price chart.</p>
 <h2>Expectancy: average outcome per decision</h2>
 <p>Expectancy is the average net outcome over a set of decisions. In a simplified fixed-win/fixed-loss setting, it can be written as:</p>
-<p>[E=p_w\times W-p_l\times L]</p>
+<div class="math">\[E=p_w\times W-p_l\times L\]</div>
 <p>where <code>p_w</code> is the fraction of winning outcomes, <code>W</code> is the average net win, <code>p_l</code> is the fraction of losing outcomes and <code>L</code> is the average net loss expressed as a positive amount.</p>
 <p>For a general set of trade outcomes, calculate the mean of the net returns after all defined costs. Expectancy depends on the exit rules and the distribution of returns, not just the model's positive-label rate.</p>
 <p>A high classification precision does not guarantee positive expectancy. A system might identify many small gains and a few large losses. Another might have lower precision but a favourable payoff distribution. The full outcome distribution matters.</p>
 <h2>Sharpe ratio: return relative to variability</h2>
 <p>The Sharpe ratio compares average excess return with the variability of returns over a specified period:</p>
-<p>[\text{Sharpe}=\frac{\text{mean}(R-R_f)}{\text{standard deviation}(R-R_f)}]</p>
+<div class="math">\[\text{Sharpe}=\frac{\text{mean}(R-R_f)}{\text{standard deviation}(R-R_f)}\]</div>
 <p>where <code>R</code> is the return series and <code>R_f</code> is the risk-free return over the matching interval. In practice, analysts often use a simplified formula, but they must state the return frequency, annualisation method and assumptions.</p>
 <p>A Sharpe ratio can be misleading if returns are serially correlated, samples are small, costs are omitted or the backtest uses unrealistic execution assumptions. Annualising a short and noisy sample can create an impressive-looking number that does not have stable meaning.</p>
 <h2>Drawdown: how far the process falls from a peak</h2>

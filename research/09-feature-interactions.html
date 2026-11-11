@@ -4,7 +4,7 @@
 <p>An interaction exists when the relationship between one feature and the outcome depends on the value of another feature.</p>
 <p>Suppose volume is associated with positive outcomes only when liquidity is above a certain level. Looking at volume alone may show a weak or inconsistent relationship. Looking at liquidity alone may also show a weak relationship. But the combination—high volume with adequate liquidity—may be more informative.</p>
 <p>A simple linear model can represent an interaction by adding a product term:</p>
-<p>[y=\beta_0+\beta_1x_1+\beta_2x_2+\beta_3(x_1x_2)]</p>
+<div class="math">\[y=\beta_0+\beta_1x_1+\beta_2x_2+\beta_3(x_1x_2)\]</div>
 <p>Here, the effect associated with <code>x1</code> changes depending on <code>x2</code>. The interaction coefficient is not a causal explanation; it describes a pattern in the fitted model.</p>
 <h2>Examples from token-activity features</h2>
 <p><strong>Volume and liquidity:</strong> high trading volume with low liquidity may describe a very different environment from high volume supported by deeper liquidity.</p>

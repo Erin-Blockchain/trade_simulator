@@ -2,9 +2,9 @@
 <p>This is not merely a statistical technicality. It changes what the number means. A ratio of 20,000 may look like extraordinary growth, even when the underlying activity is modest because the starting value was close to zero.</p>
 <h2>The arithmetic behind the problem</h2>
 <p>In the BSC research pipeline, <code>growth_10</code> was defined as cumulative quote volume during the first ten minutes divided by cumulative quote volume during the first five minutes:</p>
-<p>[\text{growth_10}=\frac{\text{vol_10}}{\text{vol_5}}]</p>
+<div class="math">\[\text{growth\_10}=\frac{\text{vol\_10}}{\text{vol\_5}}\]</div>
 <p>Because <code>vol_10</code> includes the first five minutes, it can also be rewritten as:</p>
-<p>[\text{growth_10}=1+\frac{\text{incremental volume from minute 5 to 10}}{\text{vol_5}}]</p>
+<div class="math">\[\text{growth\_10}=1+\frac{\text{incremental volume from minute 5 to 10}}{\text{vol\_5}}\]</div>
 <p>This second form makes the denominator problem obvious. Suppose the first five-minute volume is $1 and the next five minutes add $20. The cumulative ratio is 21. Now suppose the first five-minute volume is $0.01 and the next five minutes add the same $20. The ratio becomes 2,001. The additional volume is identical, but the ratio differs dramatically because the starting baseline changed.</p>
 <p>The second observation is not necessarily wrong. It is simply not comparable to the first without considering the absolute volumes.</p>
 <h2>A case worth investigating</h2>
@@ -22,7 +22,7 @@
 <h2>Denominator floors and transformations</h2>
 <p>One option is to define a minimum denominator. For example, a ratio might only be considered valid when <code>vol_5</code> exceeds a pre-defined floor. This can prevent unstable values, but the floor should have a defensible meaning in the measurement units. It should not be chosen solely because it improves one holdout result.</p>
 <p>Another option is a smoothed ratio:</p>
-<p>[\frac{\text{vol_10}+a}{\text{vol_5}+b}]</p>
+<div class="math">\[\frac{\text{vol\_10}+a}{\text{vol\_5}+b}\]</div>
 <p>where the constants are chosen with care. Smoothing changes the feature definition and can compress meaningful differences, so it needs a clear rationale and out-of-time testing. A log transformation can reduce right-skew, but it does not automatically fix the underlying interpretability problem.</p>
 <p>You can also model absolute incremental volume and baseline volume separately, then test whether an interaction between them adds value.</p>
 <h2>Avoid the opposite mistake</h2>
