@@ -45,9 +45,40 @@ def binomial_pmf(n, k, p):
     return math.comb(n, k) * (p**k) * ((1 - p) ** (n - k))
 
 
+# --------------------------------------------------------------------------- #
+# Research articles: research/index.json lists them, research/<slug>.html holds
+# each body (pre-rendered from markdown), static/research/<slug>.png the cover.
+# --------------------------------------------------------------------------- #
+import json  # noqa: E402
+from flask import abort  # noqa: E402
+
+RESEARCH_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "research")
+
+
+def _research_index():
+    try:
+        with open(os.path.join(RESEARCH_DIR, "index.json"), encoding="utf-8") as f:
+            return sorted(json.load(f), key=lambda a: a["ep"])
+    except (OSError, ValueError):
+        return []
+
+
 @app.route('/')
 def home():
-    return render_template('index.html')
+    return render_template('index.html', articles=_research_index())
+
+
+@app.route('/research/<slug>')
+def research_article(slug):
+    arts = _research_index()
+    pos = next((i for i, a in enumerate(arts) if a["slug"] == slug), None)
+    if pos is None:                      # only slugs from the index: no path tricks
+        abort(404)
+    with open(os.path.join(RESEARCH_DIR, slug + ".html"), encoding="utf-8") as f:
+        body = f.read()
+    return render_template('article.html', a=arts[pos], body=body,
+                           prev=arts[pos - 1] if pos > 0 else None,
+                           next=arts[pos + 1] if pos + 1 < len(arts) else None)
 
 
 @app.route('/api/simulate', methods=['POST'])

@@ -1,0 +1,83 @@
+<p>A classifier may produce a probability score for every observation. To turn those scores into a selected list, someone must choose a threshold. A score above the threshold is classified as positive; a score below it is not.</p>
+<p>That threshold is not a universal property of the model. It is a decision rule whose consequences depend on the candidate population, class balance and cost of different errors.</p>
+<h2>What changes when the threshold moves?</h2>
+<p>Lowering the threshold usually selects more observations. This can increase recall because the model captures more positive cases. But it can also increase false positives and reduce precision.</p>
+<p>Raising the threshold usually produces a smaller, more selective group. Precision may improve, but recall can fall sharply because more genuine positives are left unselected.</p>
+<p>The exact relationship depends on the score distribution. It should be measured rather than assumed.</p>
+<h2>A historical BSC example</h2>
+<p>In one Stage 1 out-of-fold evaluation, the threshold table looked like this:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Threshold</th>
+<th style="text-align: right;">Candidates</th>
+<th style="text-align: right;">GOOD</th>
+<th style="text-align: right;">BAD</th>
+<th style="text-align: right;">GOOD rate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0.45</td>
+<td style="text-align: right;">932</td>
+<td style="text-align: right;">296</td>
+<td style="text-align: right;">636</td>
+<td style="text-align: right;">31.8%</td>
+</tr>
+<tr>
+<td style="text-align: right;">0.50</td>
+<td style="text-align: right;">657</td>
+<td style="text-align: right;">224</td>
+<td style="text-align: right;">433</td>
+<td style="text-align: right;">34.1%</td>
+</tr>
+<tr>
+<td style="text-align: right;">0.55</td>
+<td style="text-align: right;">416</td>
+<td style="text-align: right;">162</td>
+<td style="text-align: right;">254</td>
+<td style="text-align: right;">38.9%</td>
+</tr>
+<tr>
+<td style="text-align: right;">0.60</td>
+<td style="text-align: right;">242</td>
+<td style="text-align: right;">107</td>
+<td style="text-align: right;">135</td>
+<td style="text-align: right;">44.2%</td>
+</tr>
+<tr>
+<td style="text-align: right;">0.65</td>
+<td style="text-align: right;">125</td>
+<td style="text-align: right;">54</td>
+<td style="text-align: right;">71</td>
+<td style="text-align: right;">43.2%</td>
+</tr>
+<tr>
+<td style="text-align: right;">0.70</td>
+<td style="text-align: right;">46</td>
+<td style="text-align: right;">23</td>
+<td style="text-align: right;">23</td>
+<td style="text-align: right;">50.0%</td>
+</tr>
+<tr>
+<td style="text-align: right;">0.75</td>
+<td style="text-align: right;">13</td>
+<td style="text-align: right;">9</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">69.2%</td>
+</tr>
+</tbody>
+</table>
+<p>The general pattern is a smaller candidate set as the threshold rises. The GOOD rate generally improves, though it is not perfectly monotonic. At the highest threshold, only 13 cases remain. That 69.2% rate is based on a small sample and should be treated cautiously.</p>
+<p>This table describes one historical evaluation. It does not prove that 0.75 is the best threshold in a future period or for a different use case.</p>
+<h2>Pick the threshold for the actual decision</h2>
+<p>Before selecting a threshold, define the objective. Is the goal to keep a candidate list small? To find as many positive labels as possible? To maintain a minimum level of precision? To reduce false positives under a fixed review capacity?</p>
+<p>Then choose the primary metric and constraint using development data. A precision-recall curve can show the trade-off across thresholds. A confusion matrix at the selected threshold shows the actual counts. A cost-sensitive objective may be appropriate when the consequences of false positives and false negatives differ, but the costs need to be specified honestly.</p>
+<p>Do not choose a threshold simply because it produces the most attractive percentage. A threshold with 100% precision on five cases may be less reliable than a threshold with 50% precision on hundreds, depending on the task and evidence.</p>
+<h2>Re-evaluate after the model changes</h2>
+<p>Thresholds are tied to score distributions and calibration. A new feature set, model version, candidate population or market period can change those distributions. Reassess threshold behaviour using later validation data. If scores are treated as probabilities, check calibration as well; a threshold of 0.50 is not automatically meaningful if the model is poorly calibrated.</p>
+<p>For a two-stage system, there are two thresholds to consider. Stage 1 determines the candidates Stage 2 is allowed to see. Stage 2 determines which of those candidates are selected. Evaluate the whole cascade, because a strict first-stage threshold can cap the maximum recall available to the second stage.</p>
+<h2>Make threshold selection reproducible</h2>
+<p>A threshold-selection report should state the optimisation rule, candidate thresholds, minimum sample requirements and primary metric. For example, a research process might choose the highest-recall threshold subject to a pre-specified precision floor and minimum selected count. The exact rule depends on the use case, but writing it down before comparing results reduces the chance of choosing a threshold simply because it produced the most attractive historical percentage.</p>
+<h2>The practical lesson</h2>
+<p>A threshold is a policy choice built on model scores, not a magic number. Define the objective, inspect precision and recall across thresholds, include counts and uncertainty, tune on development data and confirm the choice on a later untouched period.</p>

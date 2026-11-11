@@ -1,0 +1,28 @@
+<p>Machine-learning models do not receive the world as it is. They receive columns of numbers created by data pipelines. Those numbers may be skewed, sparse, rounded, duplicated, truncated or affected by unusual events. Before changing a model because a feature appears powerful, understand how that feature is distributed and how it was calculated.</p>
+<p>An extreme value can represent a genuine rare event. It can also be a measurement error, a small-denominator effect or a feature-definition problem. The point of outlier analysis is not to delete every unusual observation. It is to learn what produced it.</p>
+<h2>Look beyond the average</h2>
+<p>For each numerical feature, examine the count of valid values, missingness, minimum, maximum, median, standard deviation and selected percentiles. The 95th, 99th and 99.9th percentiles are particularly useful for heavy-tailed features because the maximum alone tells little about how unusual an observation is.</p>
+<p>Plot the distribution on both linear and logarithmic scales where appropriate. A histogram can show whether most observations are concentrated near zero while a small number stretch the axis. A box plot can flag extreme tails, but it cannot explain why they exist.</p>
+<p>Compare distributions by label as well. The overall distribution can conceal the fact that GOOD and BAD observations have different tails or different relationships with the feature.</p>
+<h2>Inspect the feature-generation logic</h2>
+<p>A model sees the final column, not the intention behind it. Trace an extreme value back through the pipeline. Check units, scaling, rounding, time windows, missing-value handling, zero denominators and whether values are cumulative or incremental.</p>
+<p>In the BSC pipeline, for example, <code>growth_10</code> was calculated as cumulative <code>vol_10</code> divided by cumulative <code>vol_5</code>, after the volume values had been rounded. That formula has a specific interpretation and can produce extreme ratios when the five-minute denominator is very small. A very high value is not automatically evidence of extraordinary demand.</p>
+<p>One token in the research review had a reported <code>growth_10</code> value of 20,975.2 and an observed early trade under one dollar during its first nine minutes. That observation is a reason to inspect the exact <code>vol_5</code> and <code>vol_10</code> inputs, not a reason to assume the record is wrong or to delete it. The ratio's denominator must be confirmed from the source rows.</p>
+<h2>Separate rare behaviour from bad data</h2>
+<p>A genuine outlier may be exactly the behaviour the model should learn about. Removing it simply because it is unusual can erase important information. Conversely, retaining a corrupted value can distort scaling, feature importance or split decisions.</p>
+<p>For every extreme record, check:</p>
+<ol>
+<li>Does the raw source data support the value?</li>
+<li>Is the time window correct?</li>
+<li>Are the units consistent?</li>
+<li>Does the formula behave sensibly near zero?</li>
+<li>Is the observation a legitimate rare case or a pipeline defect?</li>
+</ol>
+<p>Document the decision. If the value is valid, retain it and consider whether the model can handle the skew. If it is invalid, correct the source or apply a documented quality rule. Avoid silent clipping that changes the research population without explanation.</p>
+<h2>Transformations and robust alternatives</h2>
+<p>For positive, strongly skewed variables, a logarithmic transformation can reduce the influence of the far tail. A common form is <code>log1p(x)</code>, which is defined at zero. Ratios may need separate treatment because a log transformation does not solve an unstable denominator. Winsorisation or clipping can limit extreme values, but thresholds must be fitted on training data only and validated chronologically.</p>
+<p>Tree-based models can tolerate some nonlinear scaling differences, but they are not immune to corrupt features, leakage or misleading ratios. Linear models often benefit from standardisation, while still requiring careful treatment of skew and outliers.</p>
+<h2>Build an outlier audit trail</h2>
+<p>For each investigated extreme, save the token identifier internally, raw trade rows, derived numerator and denominator, time-window boundaries, calculation version and final disposition. A separate audit file prevents a future pipeline change from making the original decision impossible to reconstruct. Re-run the same audit after changes to rounding, quote conversion or event timing. This is especially important when an extreme observation could materially affect a percentile, a feature transformation or a model split.</p>
+<h2>The practical lesson</h2>
+<p>Outlier analysis is a feature-engineering audit, not a cosmetic cleaning step. Inspect percentiles, compare labels, trace extreme rows to raw inputs and document every transformation. Keep the distinction between “unusual but valid” and “invalid measurement” clear. A model becomes more reliable when its inputs have understandable meanings.</p>

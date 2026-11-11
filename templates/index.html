@@ -481,6 +481,29 @@
             position: relative;
             padding-left: 16px;
         }
+        .research-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+        .research-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            text-decoration: none;
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+        }
+        .research-card:hover { border-color: var(--neon-green); box-shadow: 0 0 15px rgba(0, 255, 136, 0.15); transform: translateY(-2px); }
+        .research-card img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; border-bottom: 1px solid var(--border-color); }
+        .research-card-body { padding: 14px 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+        .research-meta { font-family: var(--font-mono); font-size: 11px; color: var(--neon-green); letter-spacing: 0.5px; }
+        .research-title { font-family: var(--font-mono); font-size: 14px; font-weight: 700; line-height: 1.4; }
+        .research-excerpt { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
         .intel-feature-list li::before {
             content: '▹';
             position: absolute;
@@ -525,6 +548,7 @@
         <div class="nav-tabs">
             <button class="tab-btn active" onclick="switchTab('sim', event)"><span>01</span> TRADE_SIMULATOR</button>
             <button class="tab-btn" onclick="switchTab('intel', event)"><span>02</span> TOKEN_INTEL</button>
+            <button class="tab-btn" id="tab-research" onclick="switchTab('research', event)"><span>03</span> RESEARCH</button>
         </div>
     </div>
 
@@ -773,6 +797,28 @@
                 processing (results in seconds, not minutes) is <b style="color:var(--neon-green);">coming soon</b>.
             </div>
 
+        </div>
+        <!-- Tool View: Research -->
+        <div class="main-content" id="view-research" style="display: none;">
+            <div class="intel-hero-card">
+                <div class="intel-hero-title">📚 SEEKAL // RESEARCH</div>
+                <div class="intel-hero-desc">
+                    Beyond Prediction: building, testing and improving a machine-learning trading system.
+                    Practical notes on evaluation, features, validation and risk, one topic per episode.
+                </div>
+            </div>
+            <div class="research-grid">
+                {% for a in articles %}
+                <a class="research-card" href="/research/{{ a.slug }}">
+                    <img src="{{ url_for('static', filename='research/' ~ a.slug ~ '.png') }}" alt="{{ a.title }}" loading="lazy">
+                    <div class="research-card-body">
+                        <div class="research-meta">EP {{ '%02d' % a.ep }} · {{ a.minutes }} min read</div>
+                        <div class="research-title">{{ a.title }}</div>
+                        <div class="research-excerpt">{{ a.excerpt }}</div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
         </div>
     </div>
 
@@ -1099,6 +1145,8 @@
 
             const simView = document.getElementById('view-sim');
             const intelView = document.getElementById('view-intel');
+            const researchView = document.getElementById('view-research');
+            researchView.style.display = 'none';
             const sidebar = document.getElementById('sidebar-controls');
             const container = document.querySelector('.container');
 
@@ -1109,6 +1157,12 @@
                 sidebar.style.opacity = '1';
                 sidebar.style.pointerEvents = 'auto';
                 container.classList.remove('no-sidebar');
+            } else if (tabKey === 'research') {
+                simView.style.display = 'none';
+                intelView.style.display = 'none';
+                researchView.style.display = 'flex';
+                sidebar.style.display = 'none';
+                container.classList.add('no-sidebar');
             } else if (tabKey === 'intel') {
                 simView.style.display = 'none';
                 intelView.style.display = 'flex';
@@ -1117,7 +1171,13 @@
             }
         }
 
-        window.onload = () => { runSimulation(false); };
+        window.onload = () => {
+            runSimulation(false);
+            // links back from an article land on /#research
+            if (location.hash === '#research') {
+                document.getElementById('tab-research').click();
+            }
+        };
     </script>
 </body>
 </html>

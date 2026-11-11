@@ -1,0 +1,24 @@
+<p>Randomly splitting a time-dependent dataset can make a model appear more capable than it really is. If a model trains on later observations and is evaluated on earlier ones, information about future market conditions may influence a supposedly historical prediction. Chronological cross-validation is designed to avoid that problem.</p>
+<p>When labels depend on future outcomes, an additional step—purging—may be needed to prevent overlapping outcome windows from crossing fold boundaries.</p>
+<h2>Why random splitting can mislead</h2>
+<p>In a random split, observations from the same market period can appear in both training and validation sets. The model may learn patterns specific to that period and then be tested on neighbouring observations with very similar conditions.</p>
+<p>This can underestimate the difficulty of predicting a genuinely later period. It can also allow future observations to influence a model that is meant to represent what would have been known at an earlier point.</p>
+<p>Chronological validation keeps the order intact: train on earlier rows, validate on later rows. An expanding-window design adds earlier validation periods to the training set as the evaluation moves forward.</p>
+<h2>The overlapping-label problem</h2>
+<p>Some labels use information from a period after the prediction timestamp. Imagine a row whose outcome is determined by what happens over the next few hours. If that row is in the training set and its label window overlaps the validation period, the training label can contain information from the period the model is supposed to predict.</p>
+<p>Purging removes training rows whose label intervals overlap the validation interval. A gap or embargo may also be used in some designs to reduce dependence near the boundary, depending on the data structure and validation method.</p>
+<p>The purge period should reflect the label construction. If the outcome horizon is H hours, a purge of H hours is a defensible starting design for that specific setup, subject to exact timestamps and event windows. It is not a universal constant for every dataset.</p>
+<h2>A practical expanding-window design</h2>
+<p>Suppose observations are sorted by launch time. The first block is used as the initial training period. The next block becomes validation. The model is fitted only on the earlier observations that survive the purge. Then the training window expands and the next chronological block is evaluated.</p>
+<p>This produces fold-level results that show how the model behaves as time moves forward. It also creates OOF predictions for validation rows, provided each row is scored by a model that did not train on it.</p>
+<p>Some early rows may never be validation rows because they are needed to form the initial training period. That is normal. Report the count rather than silently treating all rows as out-of-fold predictions.</p>
+<h2>Keep preprocessing inside the fold</h2>
+<p>Leakage can enter before model fitting. If a scaler, imputer, feature selector or target encoder is calculated using the full dataset, information from validation rows can influence the training process. Fit learned transformations on each training fold and apply them to that fold's validation data.</p>
+<p>Feature generation must also respect the prediction timestamp. A feature that uses an event occurring after the prediction moment is leakage, even if cross-validation is chronological.</p>
+<h2>What to report</h2>
+<p>Record every fold's training dates, validation dates, row counts, class balance and purge boundaries. Report fold-level metrics as well as pooled metrics. If performance is strong in one period and weak in another, show that variation rather than hiding it in an average.</p>
+<p>The BSC pipeline used expanding chronological folds and a purge equal to the length of its research label's look-ahead window. That is a design choice tied to the label; a different horizon or event structure would require a different purge analysis.</p>
+<h2>Treat fold boundaries as part of the experiment</h2>
+<p>Save the exact timestamps, not just fold numbers. If timestamps have irregular gaps or labels end at different times, a fixed number of rows may not correspond to a fixed time interval. Where possible, store each observation’s label end time and purge based on interval overlap. Review the boundary rows manually after changing the label horizon, because a correct purge for one target may be insufficient for another.</p>
+<h2>The practical lesson</h2>
+<p>Chronological splitting answers a realistic question: can a model trained on earlier data perform on later data? Purging addresses overlapping future label windows. Together with fold-contained preprocessing and out-of-fold predictions, they form a stronger basis for evaluating time-dependent models. They do not guarantee future success, but they reduce avoidable leakage.</p>

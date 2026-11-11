@@ -1,0 +1,25 @@
+<p>Two features can sound as though they measure the same thing while describing different behaviour. Cumulative volume tells us how much activity has occurred since the beginning of a window. Incremental volume tells us how much activity occurred during one segment of that window.</p>
+<p>Both can matter. Confusing them can lead to repeated information, misleading growth ratios and an incomplete picture of how activity developed.</p>
+<h2>What cumulative volume tells you</h2>
+<p>Suppose a token has quote volume of $100 during the first five minutes and $60 more between minutes five and ten. Its cumulative volume at minute ten is $160.</p>
+<p>Cumulative volume is useful because it measures total recorded activity over a defined period. It is often easier to compare across tokens and windows, provided the same time boundaries and currency units are used.</p>
+<p>But cumulative volume hides the path. A total of $160 could mean $150 in the first five minutes and $10 in the next five, or $20 in the first five and $140 in the next five. Both produce the same cumulative total, but the activity pattern is very different.</p>
+<h2>What incremental volume tells you</h2>
+<p>Incremental volume isolates the activity within a segment. In the example above, the five-to-ten-minute incremental volume is $60:</p>
+<p>[\text{incremental}_{5\rightarrow10}=\text{vol_10}-\text{vol_5}]</p>
+<p>It answers a different question: how much additional activity arrived after the initial window?</p>
+<p>This can help distinguish a launch that begins with concentrated early activity and then fades from one that builds activity over time. It still does not prove that demand is organic, broad or persistent. Incremental volume should be examined alongside trade size, buyer participation, liquidity and other quality measures.</p>
+<h2>Why the ratio needs context</h2>
+<p>The BSC pipeline's <code>growth_10</code> feature is cumulative <code>vol_10</code> divided by cumulative <code>vol_5</code>. It is not simply the amount of new volume between minutes five and ten. It equals one plus incremental volume divided by the initial five-minute volume.</p>
+<p>That distinction matters. A high ratio could reflect a strong second interval, a very small first interval, or both. Therefore, the ratio is best interpreted with <code>vol_5</code> and the incremental five-to-ten-minute amount visible beside it.</p>
+<p>A practical feature table might contain <code>vol_5</code>, <code>vol_10</code>, <code>incremental_vol_5_10</code> and <code>growth_10</code>. The first three describe scale and timing. The fourth expresses relative change. Whether all four improve a model is an empirical question; correlated features may add little or make interpretation harder.</p>
+<h2>Compare patterns, not just totals</h2>
+<p>For each observation, compare the early and later segments. Ask whether activity is accelerating, slowing or remaining steady. Then compare those patterns between GOOD and BAD labels. Use medians and percentiles because volume data is often skewed. Do not rely only on averages, which can be dominated by a few very large observations.</p>
+<p>Consider dividing incremental volume by the number of minutes in the segment if windows have different lengths. Keep windows consistent wherever possible. If one feature covers five minutes and another covers fifteen, raw totals are not directly comparable without accounting for duration.</p>
+<h2>Volume is not participation</h2>
+<p>A small number of large trades can generate high volume. Many small trades can produce similar volume. Neither pattern is automatically better. Add buyer counts, repeat-buyer measures, concentration and trade-size distributions to understand how the activity is distributed.</p>
+<p>Even then, wallet-level counts are not the same as independent human participants. Wallets can be controlled by related parties, and one actor can use multiple addresses. Treat these fields as observable proxies, not proof of identity or intent.</p>
+<h2>Make window boundaries explicit</h2>
+<p>A feature specification should state whether a window includes its starting or ending minute, how late-arriving events are handled and whether timestamps are measured from launch time or first observed trade. Two implementations can both be called “ten-minute volume” while using different boundaries. Validate calculations with a few hand-checked examples from raw trades. Consistent definitions matter more than adding many time windows whose boundaries are not reproducible.</p>
+<h2>The practical lesson</h2>
+<p>Cumulative volume tells you how much has happened so far. Incremental volume tells you what arrived during a specific interval. Growth ratios put the two into a relative relationship, but can become unstable when the baseline is tiny. Keep the measures conceptually separate, inspect their distributions and test whether each contributes information beyond the others.</p>

@@ -1,0 +1,22 @@
+<p>A model can fit historical data extremely well and still perform poorly on new observations. This happens when the model learns patterns that are specific to the training sample rather than relationships that generalise. Regularisation is one way to discourage that behaviour.</p>
+<p>It does not guarantee generalisation, but it can make a model less willing to rely on fragile patterns.</p>
+<h2>The bias-variance trade-off</h2>
+<p>A very simple model may miss useful structure. This is underfitting. A very flexible model may fit accidental details in the training data. This is overfitting. Good model design aims for a balance: enough flexibility to capture stable relationships, but not so much that noise dominates.</p>
+<p>Regularisation adds a penalty to the model's objective. The model is rewarded for fitting the training data but penalised for excessive complexity or large parameters.</p>
+<h2>Regularisation in logistic regression</h2>
+<p>In logistic regression, L2 regularisation adds a penalty related to the sum of squared coefficients. It tends to shrink weights toward zero without usually making them exactly zero. L1 regularisation penalises the sum of absolute coefficients and can set some weights to zero, creating a form of embedded feature selection. Elastic Net combines both.</p>
+<p>The strength of the penalty matters. Too little may allow unstable coefficients; too much may remove useful signal and cause underfitting. Standardisation is generally important when features are measured on very different scales, because the penalty otherwise treats coefficient sizes in a scale-dependent way.</p>
+<p>Correlated predictors complicate interpretation. A regularised model may distribute weight across similar features or choose one over another. Coefficients remain conditional associations, not causal effects.</p>
+<h2>Regularisation in gradient boosting</h2>
+<p>Tree ensembles have their own controls. Learning rate, number of leaves, maximum depth, minimum observations per leaf, number of estimators, feature and row subsampling, and L1/L2 penalties can limit complexity.</p>
+<p>A lower learning rate often requires more trees. More leaves allow more complex splits. Larger minimum leaf sizes can discourage rules based on tiny groups. These controls interact, so tuning them one at a time without a validation plan can be misleading.</p>
+<h2>Chronological validation is still essential</h2>
+<p>Regularisation cannot repair leakage. It cannot make a mislabeled outcome correct. It cannot guarantee stability across market regimes. The model must still be evaluated on later observations, using folds that respect time and any necessary purge interval.</p>
+<p>Choose regularisation settings using development data only. If you repeatedly tune against the final holdout, you gradually turn it into part of the training process—even if the model's fitting code never directly sees the holdout rows.</p>
+<h2>Small samples require restraint</h2>
+<p>The BSC Stage 2 candidate sample was much smaller than the original dataset. This makes complexity control especially important. A flexible gradient-boosted model may discover useful nonlinear interactions, but it may also fit peculiarities of a small candidate population. A regularised logistic model may be less flexible, yet provide a valuable baseline.</p>
+<p>The Stage 2 comparison was mixed across metrics. That is a reason to continue with careful chronological experiments, not to increase complexity until one score looks better. Every added degree of freedom should earn its place through repeatable validation.</p>
+<h2>Read tuning curves instead of choosing one lucky setting</h2>
+<p>Plot validation performance against the regularisation strength or model-complexity setting. A broad region of similar performance is often more reassuring than one isolated optimum. If a tiny parameter change causes a large metric swing, the model may be unstable or the validation sample may be too small. Select settings using the development folds, consider fold variability and avoid using the final holdout to resolve small tuning differences.</p>
+<h2>The practical lesson</h2>
+<p>Regularisation discourages models from relying too heavily on fragile patterns. It is one part of a broader defence against overfitting that also includes sound labels, leakage controls, chronological validation, limited experimentation and a final holdout that remains untouched. Simpler is not always better—but complexity must be justified by evidence.</p>
