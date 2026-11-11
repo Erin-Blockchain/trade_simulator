@@ -351,21 +351,80 @@ def _bsc_mint_block(pool, token, hb):
     return first
 
 
+def _fill_portal(pool, store, b0, b1):
+    """Make every Portal event in [b0, b1] available in the store.
+    Complete 2,000-block segments go through store.ensure as always (cached
+    and marked done). The newest, still-open segment can't be marked done, so
+    its blocks up to b1 are read straight from the chain and loaded with
+    store._ingest(logs, None): the store's own no-segment path (the live
+    watcher's). When that segment completes, a later ensure reads it whole;
+    rows are keyed (tx, log index), so nothing is counted twice."""
+    from bsc_rpc import scan_logs
+    last_ok = ((store.safe_head + 1) // C.SEG) * C.SEG - 1   # last block of the last complete segment
+    if b0 <= last_ok:
+        store.ensure(pool, b0, min(b1, last_ok))
+    t0 = max(b0, last_ok + 1)
+    if t0 <= b1:
+        logs = scan_logs(pool, C.PORTAL, C.STORE_TOPICS, t0, b1, chunk=C.SEG, concurrency=4,
+                         label=f"portal tail {t0}")
+        store._ingest(logs, None)
+
+
+class _Filled:
+    """The store, for C.stitched, after _fill_portal already loaded the range:
+    its own ensure() would refuse the still-open segment (NotReady)."""
+    def __init__(self, store):
+        self._s = store
+
+    def ensure(self, *_a, **_k):
+        return 0
+
+    def __getattr__(self, k):
+        return getattr(self._s, k)
+
+
+class _AgeClock(C.Clock):
+    """C.Clock cut at the snapshot: any moment at or after launch + age maps to
+    the snapshot block. bsc_core's feature functions also look at +5/+10/+15
+    min; for a younger snapshot those are later than it, so they just see the
+    snapshot (none of the numbers shown come from those windows). Before the
+    snapshot it is C.Clock unchanged, except near the chain head, where the
+    store may hold no trade after the moment yet: then the search is bounded
+    by the safe head (real block timestamps, as last_block_le does)."""
+    def __init__(self, pool, lb, lu, store, safe_block, safe_ts):
+        super().__init__(pool, lb, lu, store)
+        self.safe_block, self.safe_ts = safe_block, safe_ts
+        self.end_ts = self.b_end = None
+
+    def last_block(self, ts):
+        if self.end_ts is not None and ts >= self.end_ts:
+            return self.b_end
+        if ts >= self.safe_ts:
+            return self.safe_block
+        if ts not in self.last and self.store.ts_bracket(ts)[1] is None:
+            lo, hi = self.lb, self.safe_block           # ts(lo) <= ts < ts(hi)
+            while hi - lo > 1:
+                mid = (lo + hi) // 2
+                if bsc_block_ts(self.pool, mid) <= ts:
+                    lo = mid
+                else:
+                    hi = mid
+            self.last[ts] = lo
+        return super().last_block(ts)
+
+
 def _bsc_launch(pool, store, token):
     L = store.launch(token)
     if L:
         return L
     hb = bsc_head(pool)
-    mb = _bsc_mint_block(pool, token, hb)
+    store.safe_head = hb - 20
+    mb = _bsc_mint_block(pool, token, store.safe_head)
     if mb is None:
         raise LookupError("No mint found for this token on BSC "
-                          f"(searched the last {BSC_LAUNCH_LOOKBACK_DAYS:g} days).")
-    store.safe_head = hb - 20
-    try:
-        store.ensure(pool, mb, mb)          # the Portal segment holding the launch
-    except C.NotReady:
-        raise LookupError("This coin launched a few minutes ago; its launch block "
-                          "isn't settled yet. Try again shortly.")
+                          f"(searched the last {BSC_LAUNCH_LOOKBACK_DAYS:g} days). "
+                          "If it launched seconds ago, try again shortly.")
+    _fill_portal(pool, store, mb, mb)       # the launch block's Portal events
     L = store.launch(token)
     if not L:
         raise LookupError("This token is not a Flap launch (no TokenCreated in its mint block).")
@@ -374,8 +433,8 @@ def _bsc_launch(pool, store, token):
 
 def bsc_intel(token, age_min):
     """The collector's steps (bsc_core._stage_30) with the end moment set to
-    launch + age instead of +30:00; no gate. Every number comes from the
-    collector's own functions."""
+    launch + age instead of +30:00; no gate. Any age, up to the coin's current
+    age (like Robinhood). Every number comes from the collector's own functions."""
     FN = _bsc_feat_new()
     pool, store, pricer = _bsc()
     tok = token.lower()
@@ -385,30 +444,34 @@ def bsc_intel(token, age_min):
     lu, lb = int(L["ts"]), int(L["block"])
 
     hb = bsc_head(pool)
-    hts = bsc_block_ts(pool, hb)
-    store.safe_head = hb - 20
-    coin_age_now_min = (hts - lu) / 60.0
-    if lu + 15 * 60 > hts:
-        raise LookupError("Coin is under 15 minutes old; try again in a few minutes.")
+    store.safe_head = safe = hb - 20          # ~9 s behind the head: settled blocks only
+    safe_ts = bsc_block_ts(pool, safe)
+    coin_age_now_min = (safe_ts - lu) / 60.0
 
-    # the Portal cache only holds complete segments, so the newest ~15 min
-    # (one segment) can't be read yet: an age past that is capped
-    last_ok = ((store.safe_head + 1) // C.SEG) * C.SEG - 1
     end_ts = int(lu + age_min * 60)
-    clock = C.Clock(pool, lb, lu, store)
-    capped = False
-    if end_ts >= bsc_block_ts(pool, last_ok):
-        b_end, end_ts, capped = last_ok, bsc_block_ts(pool, last_ok), True
+    capped = end_ts >= safe_ts
+    if capped:
+        end_ts = safe_ts
+    clock = _AgeClock(pool, lb, lu, store, safe, safe_ts)
+    if capped:
+        b_end = safe
+        _fill_portal(pool, store, lb, b_end)
     else:
-        b_end = clock.last_block(end_ts)      # every block stamped <= launch + age
+        last_ok = ((safe + 1) // C.SEG) * C.SEG - 1
+        if last_ok >= lb and end_ts < bsc_block_ts(pool, last_ok):
+            b_end = clock.last_block(end_ts)      # every block stamped <= launch + age
+            _fill_portal(pool, store, lb, b_end)
+        else:                                     # snapshot inside the open segment
+            _fill_portal(pool, store, lb, safe)
+            b_end = clock.last_block(end_ts)
+    clock.end_ts, clock.b_end = end_ts, b_end
     F = age_min if not capped else (end_ts - lu) / 60.0
     F = int(F) if float(F).is_integer() else F
 
-    store.ensure(pool, lb, b_end)
     q, qsrc, qage = pricer.usd(L["quote"], end_ts, rpc=pool, block_fn=lambda: b_end, closed=True)
     qdec = C.erc20_decimals(pool, L["quote"])
     trs = C.token_transfers(pool, tok, lb, b_end)
-    rows, grad, _exc, _dir = C.stitched(pool, store, L, lb, b_end, qdec, lambda: trs)
+    rows, grad, _exc, _dir = C.stitched(pool, _Filled(store), L, lb, b_end, qdec, lambda: trs)
 
     w = []
     for r in C._window(rows, end_ts, clock):
@@ -452,8 +515,7 @@ def bsc_intel(token, age_min):
         "quote_src": qsrc,
     }
     if capped:
-        out["note"] = (f"Latest settled data is at {F:.1f} min (coin is {coin_age_now_min:.1f} min old); "
-                       "showing that.")
+        out["note"] = f"Coin is only {coin_age_now_min:.1f} min old; showing data at its current age."
     return out
 
 
@@ -476,7 +538,10 @@ def intel():
 
         # 1. Return completed data instantly if cached
         if job_key in JOB_STORE and JOB_STORE[job_key].get("status") == "completed":
-            return jsonify(JOB_STORE[job_key]["result"])
+            res = JOB_STORE[job_key]["result"]
+            if res.get("note"):          # "showing its current age": recompute next time
+                del JOB_STORE[job_key]
+            return jsonify(res)
 
         # 2. If a background job is actively running, tell the frontend to keep waiting
         if job_key in JOB_STORE and JOB_STORE[job_key].get("status") == "processing":
