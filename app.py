@@ -520,6 +520,14 @@ def bsc_intel(token, age_min):
 
 
 # =========================================================================== #
+# What a visitor sees when a query fails. Details stay in the server log.
+GENERIC_ERROR = "Couldn't load this coin right now. Please try again in a minute."
+SKIP_MESSAGES = {
+    "unpriceable_quote": "This coin's trading pair has no USD price, so it can't be shown.",
+    "unsupported_venue": "This coin trades on a pool type Seekal doesn't support yet.",
+    "too_many_transfers": "This coin has too many token transfers to replay.",
+}
+
 
 @app.route('/api/intel', methods=['POST'])
 def intel():
@@ -571,14 +579,19 @@ def intel():
                 out = {"token": token, "chain": chain, "unit": unit,
                        "age": age, "age_min": age_min, **fn(token, age_min)}
                 JOB_STORE[job_key] = {"status": "completed", "result": out}
-            except LookupError as e:
+            except LookupError as e:          # our own plain-language messages
                 JOB_STORE[job_key] = {"status": "error", "message": str(e)}
             except C.Skip as e:
-                JOB_STORE[job_key] = {"status": "error", "message": f"Can't read this coin: {e}"}
-            except Exception as e:
+                print(f"[intel] {chain} {token} skipped: {e}", flush=True)
+                JOB_STORE[job_key] = {"status": "error",
+                                      "message": SKIP_MESSAGES.get(e.outcome, GENERIC_ERROR)}
+            except Exception:
+                # the real error goes to the server log (journalctl -u tradeapp),
+                # never to the visitor
                 import traceback
+                print(f"[intel] {chain} {token} age {age_min} min failed:", flush=True)
                 traceback.print_exc()
-                JOB_STORE[job_key] = {"status": "error", "message": str(e)}
+                JOB_STORE[job_key] = {"status": "error", "message": GENERIC_ERROR}
 
         background_executor.submit(run_background_job)
         return jsonify({"status": "processing", "message": "Initial scan initiated..."}), 202
@@ -586,7 +599,7 @@ def intel():
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({"error": f"Server error: {type(e).__name__}: {str(e)[:200]}"}), 500
+        return jsonify({"error": GENERIC_ERROR}), 500
 
 
 if __name__ == '__main__':
