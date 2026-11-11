@@ -993,7 +993,8 @@
                 sl_pct: parseFloat(document.getElementById('sl').value) || 0,
                 tp_mult: parseFloat(document.getElementById('tp').value) || 0,
                 win_rate: parseFloat(document.getElementById('winrate').value) || 0,
-                n_trades: parseInt(document.getElementById('trades').value) || 0
+                n_trades: parseInt(document.getElementById('trades').value) || 0,
+                auto: !userInitiated
             };
 
             try {

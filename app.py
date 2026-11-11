@@ -41,6 +41,28 @@ LAUNCH_TOPIC = ("0x8d4aad4953d0ca700d468f3753aa14432d1b35b43ec6409f051f"
 SUPPORTED_CHAINS = ("robinhood", "bsc")
 
 
+# --------------------------------------------------------------------------- #
+# Usage log: one line per REAL action (a simulation someone ran, a new Token
+# Intel search), never page-load runs or result polling. usage_log.csv.
+# --------------------------------------------------------------------------- #
+USAGE_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "usage_log.csv")
+_usage_lock = threading.Lock()
+
+
+def log_usage(tool, detail=""):
+    ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "").split(",")[0].strip()
+    line = f"{time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())},{tool},{ip},{detail}\n"
+    try:
+        with _usage_lock:
+            new = not os.path.exists(USAGE_LOG)
+            with open(USAGE_LOG, "a", encoding="utf-8") as f:
+                if new:
+                    f.write("utc_time,tool,visitor_ip,detail\n")
+                f.write(line)
+    except OSError:
+        pass                         # logging must never break the app
+
+
 def binomial_pmf(n, k, p):
     return math.comb(n, k) * (p**k) * ((1 - p) ** (n - k))
 
@@ -84,6 +106,8 @@ def research_article(slug):
 @app.route('/api/simulate', methods=['POST'])
 def simulate():
     data = request.json or {}
+    if not data.get('auto'):         # the page's own run on load is not a use
+        log_usage("simulator")
     capital = float(data.get('capital', 100))
     sl_pct = float(data.get('sl_pct', 70))
     tp_mult = float(data.get('tp_mult', 10))
@@ -602,6 +626,7 @@ def intel():
             return jsonify({"error": "Age must be greater than 0."}), 400
 
         # 4. Mark as processing and launch background thread
+        log_usage("token_intel", f"{chain} {token} {age_min:g}min")
         JOB_STORE[job_key] = {"status": "processing", "progress": 0}
 
         def run_background_job():
