@@ -639,6 +639,12 @@
                     <li><b>Dev Percentage:</b> Monitor insider/creator bag weights historically.</li>
                     <li><b>Avg Order Size:</b> Identify retail FOMO vs early whale accumulation.</li>
                     <li><b>Buyer Concentration:</b> Pinpoint distribution safety thresholds.</li>
+                    <li><b>Trades:</b> Count every trade (one per transaction) up to the chosen age.</li>
+                    <li><b>Unique Buyers:</b> See how many distinct wallets had bought by then.</li>
+                    <li><b>Repeat Buyers:</b> Share of buyers who came back and bought again.</li>
+                    <li><b>Liquidity:</b> Pool depth at that exact moment, both sides in USD.</li>
+                    <li><b>Largest Buy / Sell:</b> Spot the single biggest entry and exit so far.</li>
+                    <li><b>Top 5 Buyer Share:</b> How much of all buying came from the five biggest buyers.</li>
                 </ul>
             </div>
 
@@ -652,6 +658,7 @@
                             background:#0d1424; color:#e6ecf5;
                             border:1px solid #1c2740; font-family:var(--font-mono);">
                             <option value="robinhood" selected>Robinhood Chain</option>
+                            <option value="bsc">BNB Chain (Flap)</option>
                         </select>
                     </div>
                     <div class="input-group" style="flex:2; min-width:260px;">
@@ -722,11 +729,33 @@
                         <div style="display:flex; justify-content:space-between;">
                             <span style="color:var(--text-muted);">Avg Sell Size</span>
                             <b id="r-avgsell" style="color:#ff5a6e;">-</b></div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span style="color:var(--text-muted);">Trades</span>
+                            <b id="r-trades" style="color:var(--neon-green);">-</b></div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span style="color:var(--text-muted);">Unique Buyers</span>
+                            <b id="r-ubuyers" style="color:var(--neon-green);">-</b></div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span style="color:var(--text-muted);">Repeat Buyers</span>
+                            <b id="r-repeat" style="color:var(--neon-green);">-</b></div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span style="color:var(--text-muted);">Liquidity</span>
+                            <b id="r-liq" style="color:var(--neon-green);">-</b></div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span style="color:var(--text-muted);">Largest Buy</span>
+                            <b id="r-lbuy" style="color:var(--neon-green);">-</b></div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span style="color:var(--text-muted);">Largest Sell</span>
+                            <b id="r-lsell" style="color:#ff5a6e;">-</b></div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span style="color:var(--text-muted);">Top 5 Buyer Share</span>
+                            <b id="r-top5" style="color:var(--neon-green);">-</b></div>
                     </div>
                 </div>
                 <div class="intel-card">
                     <div class="intel-card-title">🧭 Context</div>
                     <div style="font-family:var(--font-mono); font-size:13px; line-height:2.2; color:var(--text-muted);">
+                        <div>Chain: <b id="r-chain" style="color:#e2e8f0;">-</b></div>
                         <div>Launch block: <b id="r-lblock" style="color:#e2e8f0;">-</b></div>
                         <div>Snapshot block: <b id="r-tblock" style="color:#e2e8f0;">-</b></div>
                         <div>Current coin age: <b id="r-agenow" style="color:#e2e8f0;">-</b> min</div>
@@ -859,6 +888,16 @@
                         document.getElementById('r-dev').innerText = (d.dev_pct ?? 0).toFixed(2) + '%';
                         document.getElementById('r-avgbuy').innerText = money(d.avg_buy_usd) + ' (' + (d.n_buys ?? 0) + ')';
                         document.getElementById('r-avgsell').innerText = money(d.avg_sell_usd) + ' (' + (d.n_sells ?? 0) + ')';
+                        const pct = (v) => (v ?? 0).toFixed(2) + '%';
+                        document.getElementById('r-trades').innerText = (d.trades ?? 0).toLocaleString();
+                        document.getElementById('r-ubuyers').innerText = (d.unique_buyers ?? 0).toLocaleString();
+                        document.getElementById('r-repeat').innerText = pct(d.repeat_buyer_pct);
+                        document.getElementById('r-liq').innerText = money(d.liquidity_usd);
+                        document.getElementById('r-lbuy').innerText = money(d.largest_buy_usd);
+                        document.getElementById('r-lsell').innerText = money(d.largest_sell_usd);
+                        // top5_buyer_share is a 0-1 fraction; repeat_buyer_pct is already a percent
+                        document.getElementById('r-top5').innerText = pct((d.top5_buyer_share ?? 0) * 100);
+                        document.getElementById('r-chain').innerText = (d.chain === 'bsc') ? 'BNB Chain (Flap)' : 'Robinhood Chain';
                         document.getElementById('r-lblock').innerText = d.launch_block ?? '-';
                         document.getElementById('r-tblock').innerText = d.target_block ?? '-';
                         document.getElementById('r-agenow').innerText = d.coin_age_now_min ?? '-';

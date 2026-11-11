@@ -2,3 +2,6 @@ streamlit
 matplotlib
 plotly==5.24.1
 kaleido==0.2.1
+flask
+requests
+pycryptodome
