@@ -74,7 +74,7 @@ def binomial_pmf(n, k, p):
 import json  # noqa: E402
 from flask import abort  # noqa: E402
 
-SECTIONS = {"robinhood": "Robinhood Chain", "bnb": "BNB Chain", "pumpfun": "pump.fun"}
+SECTIONS = {"robinhood": "Robinhood Chain", "bnb": "BNB Chain", "solana": "Solana"}
 RESEARCH_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "research")
 
 
