@@ -5,7 +5,8 @@
   "title": "Why Machine-Learning Models Struggle to Separate True Positives from False Positives",
   "series": "Beyond Prediction: Building, Testing and Improving a Machine-Learning Trading System \u2014 Episode 01",
   "excerpt": "A model can look convincing in a dashboard and still make poor decisions. One reason is that a model score is not the same thing as a correct prediction. Another is that the examples a model calls...",
-  "minutes": 5
+  "minutes": 5,
+  "section": "bnb"
  },
  {
   "slug": "02-whole-dataset-vs-selected-predictions",
@@ -13,7 +14,8 @@
   "title": "Why Analysing the Entire Dataset Is Different from Analysing Model-Selected Predictions",
   "series": "Beyond Prediction: Building, Testing and Improving a Machine-Learning Trading System \u2014 Episode 02",
   "excerpt": "A feature can look useful across an entire dataset and become much less useful among the rows a model actually selects. The reverse can also happen: a feature with a weak overall relationship to the...",
-  "minutes": 4
+  "minutes": 4,
+  "section": "bnb"
  },
  {
   "slug": "03-roc-auc-precision-recall",
@@ -21,7 +23,8 @@
   "title": "ROC-AUC, Precision and Recall: Understanding What Your Model Is Actually Telling You",
   "series": "Beyond Prediction: Building, Testing and Improving a Machine-Learning Trading System \u2014 Episode 03",
   "excerpt": "Model evaluation can become confusing when several metrics move in different directions. A classifier may have a respectable ROC-AUC but disappoint when converted into a list of selected candidates....",
-  "minutes": 4
+  "minutes": 4,
+  "section": "bnb"
  },
  {
   "slug": "04-danger-of-small-samples",
@@ -29,7 +32,8 @@
   "title": "The Danger of Drawing Conclusions from Small Samples",
   "series": "Beyond Prediction: Building, Testing and Improving a Machine-Learning Trading System \u2014 Episode 04",
   "excerpt": "A result can be mathematically correct and still be a weak basis for a decision. If a model selects five cases and all five are positive, the observed precision is 100%. But five observations do not...",
-  "minutes": 4
+  "minutes": 4,
+  "section": "bnb"
  },
  {
   "slug": "05-feature-distributions-outliers-extremes",
@@ -37,7 +41,8 @@
   "title": "Understanding Feature Distributions, Outliers and Extreme Values",
   "series": "Beyond Prediction: Building, Testing and Improving a Machine-Learning Trading System \u2014 Episode 05",
   "excerpt": "Machine-learning models do not receive the world as it is. They receive columns of numbers created by data pipelines. Those numbers may be skewed, sparse, rounded, duplicated, truncated or affected...",
-  "minutes": 3
+  "minutes": 3,
+  "section": "bnb"
  },
  {
   "slug": "06-small-denominator-misleading-growth-ratios",
@@ -45,7 +50,8 @@
   "title": "How a Small Denominator Creates Misleading Growth Ratios",
   "series": "Beyond Prediction: Building, Testing and Improving a Machine-Learning Trading System \u2014 Episode 06",
   "excerpt": "Ratios are attractive features because they compress two measurements into one number. A growth ratio can describe how much activity increased relative to an earlier baseline. But the ratio can...",
-  "minutes": 4
+  "minutes": 4,
+  "section": "bnb"
  },
  {
   "slug": "07-cumulative-vs-incremental-volume",
@@ -53,7 +59,8 @@
   "title": "Cumulative Volume vs Incremental Volume: Understanding Trading Activity",
   "series": "Beyond Prediction: Building, Testing and Improving a Machine-Learning Trading System \u2014 Episode 07",
   "excerpt": "Two features can sound as though they measure the same thing while describing different behaviour. Cumulative volume tells us how much activity has occurred since the beginning of a window....",
-  "minutes": 3
+  "minutes": 3,
+  "section": "bnb"
  },
  {
   "slug": "08-multicollinearity-overlapping-features",
@@ -61,7 +68,8 @@
   "title": "Multicollinearity: When Multiple Features Measure Almost the Same Thing",
   "series": "Beyond Prediction: Building, Testing and Improving a Machine-Learning Trading System \u2014 Episode 08",
   "excerpt": "A dataset can contain dozens of features and still describe only a handful of underlying behaviours. Several columns may be different versions of the same measurement: cumulative volume over adjacent...",
-  "minutes": 4
+  "minutes": 4,
+  "section": "bnb"
  },
  {
   "slug": "09-feature-interactions",
@@ -69,7 +77,8 @@
   "title": "Why Feature Interactions Can Matter More Than Individual Features",
   "series": "Beyond Prediction: Building, Testing and Improving a Machine-Learning Trading System \u2014 Episode 09",
   "excerpt": "A feature can be useful only under certain conditions. High volume may mean something different when liquidity is thin than when liquidity is deep. A large growth ratio may be more informative when...",
-  "minutes": 3
+  "minutes": 3,
+  "section": "bnb"
  },
  {
   "slug": "10-measuring-growth-quality-not-magnitude",
@@ -77,7 +86,8 @@
   "title": "Measuring Growth Quality Rather Than Growth Magnitude",
   "series": "Beyond Prediction: Building, Testing and Improving a Machine-Learning Trading System \u2014 Episode 10",
   "excerpt": "Growth magnitude asks how large an increase was. Growth quality asks what kind of activity produced it. In a fast-moving dataset, an impressive number can hide a weak foundation: a tiny starting...",
-  "minutes": 4
+  "minutes": 4,
+  "section": "bnb"
  },
  {
   "slug": "11-using-quartiles-to-discover-nonlinear-relationships",
@@ -85,7 +95,8 @@
   "title": "Using Quartiles to Discover Nonlinear Relationships",
   "series": "Beyond Prediction: Building, Testing and Improving a Machine-Learning Trading System \u2014 Episode 11",
   "excerpt": "A feature does not always have a simple relationship with an outcome. More volume may be associated with better outcomes up to a point, after which the relationship flattens. A buyer-count feature...",
-  "minutes": 3
+  "minutes": 3,
+  "section": "bnb"
  },
  {
   "slug": "12-feature-selection-and-ablation",
@@ -93,7 +104,8 @@
   "title": "Feature Selection and Ablation: Why More Features Don't Always Mean Better Models",
   "series": "Beyond Prediction: Building, Testing and Improving a Machine-Learning Trading System \u2014 Episode 12",
   "excerpt": "Adding another feature can make a model look more sophisticated, but it does not guarantee better predictions. A new column may duplicate information already present, introduce noise, create leakage...",
-  "minutes": 3
+  "minutes": 3,
+  "section": "bnb"
  },
  {
   "slug": "13-logistic-regression-vs-gradient-boosting",
@@ -101,7 +113,8 @@
   "title": "Logistic Regression vs Gradient Boosting: Which Is Better for Predictive Trading?",
   "series": "Beyond Prediction: Building, Testing and Improving a Machine-Learning Trading System \u2014 Episode 13",
   "excerpt": "When comparing algorithms, it is tempting to ask which one is best. A more useful question is: which model is better suited to this dataset, this validation design and this decision? Logistic...",
-  "minutes": 3
+  "minutes": 3,
+  "section": "bnb"
  },
  {
   "slug": "14-meta-labelling-second-model-evaluates-first",
@@ -109,7 +122,8 @@
   "title": "Meta-Labelling: Using a Second Model to Evaluate the First",
   "series": "Beyond Prediction: Building, Testing and Improving a Machine-Learning Trading System \u2014 Episode 14",
   "excerpt": "A first-stage model can be useful at finding a broad set of candidates without being precise enough for a narrower decision. Meta-labelling adds a second model that evaluates the cases selected by...",
-  "minutes": 3
+  "minutes": 3,
+  "section": "bnb"
  },
  {
   "slug": "15-regularisation-preventing-models-learning-noise",
@@ -117,7 +131,8 @@
   "title": "Regularisation: Preventing Machine-Learning Models from Learning Noise",
   "series": "Beyond Prediction: Building, Testing and Improving a Machine-Learning Trading System \u2014 Episode 15",
   "excerpt": "A model can fit historical data extremely well and still perform poorly on new observations. This happens when the model learns patterns that are specific to the training sample rather than...",
-  "minutes": 3
+  "minutes": 3,
+  "section": "bnb"
  },
  {
   "slug": "16-testing-new-features-without-changing-model-architecture",
@@ -125,7 +140,8 @@
   "title": "Testing New Features Without Changing Your Existing Model Architecture",
   "series": "Beyond Prediction: Building, Testing and Improving a Machine-Learning Trading System \u2014 Episode 16",
   "excerpt": "When a model disappoints, the instinct is often to change several things at once: replace the algorithm, redesign the architecture, tune dozens of parameters and add a new feature set. That makes it...",
-  "minutes": 3
+  "minutes": 3,
+  "section": "bnb"
  },
  {
   "slug": "17-out-of-fold-predictions",
@@ -133,7 +149,8 @@
   "title": "Out-of-Fold Predictions: How to Evaluate Models Honestly",
   "series": "Beyond Prediction: Building, Testing and Improving a Machine-Learning Trading System \u2014 Episode 17",
   "excerpt": "A model's predictions on data it has already trained on are not a fair estimate of how it will behave on unseen observations. Training data has influenced the fitted model, so its scores can be...",
-  "minutes": 4
+  "minutes": 4,
+  "section": "bnb"
  },
  {
   "slug": "18-chronological-cross-validation-and-purging",
@@ -141,7 +158,8 @@
   "title": "Chronological Cross-Validation and Purging: Preventing Data Leakage",
   "series": "Beyond Prediction: Building, Testing and Improving a Machine-Learning Trading System \u2014 Episode 18",
   "excerpt": "Randomly splitting a time-dependent dataset can make a model appear more capable than it really is. If a model trains on later observations and is evaluated on earlier ones, information about future...",
-  "minutes": 3
+  "minutes": 3,
+  "section": "bnb"
  },
  {
   "slug": "19-choosing-the-right-prediction-threshold",
@@ -149,7 +167,8 @@
   "title": "Choosing the Right Prediction Threshold: Precision vs Recall",
   "series": "Beyond Prediction: Building, Testing and Improving a Machine-Learning Trading System \u2014 Episode 19",
   "excerpt": "A classifier may produce a probability score for every observation. To turn those scores into a selected list, someone must choose a threshold. A score above the threshold is classified as positive;...",
-  "minutes": 3
+  "minutes": 3,
+  "section": "bnb"
  },
  {
   "slug": "20-from-prediction-to-profitability-expectancy-sharpe-drawdown",
@@ -157,6 +176,16 @@
   "title": "From Prediction to Profitability: Expectancy, Sharpe Ratio and Drawdown",
   "series": "Beyond Prediction: Building, Testing and Improving a Machine-Learning Trading System \u2014 Episode 20",
   "excerpt": "A model can classify historical outcomes reasonably well and still fail to produce a viable real-world process. Prediction metrics describe how well a model matches labels. Profitability metrics...",
-  "minutes": 4
+  "minutes": 4,
+  "section": "bnb"
+ },
+ {
+  "slug": "pumpfun-first-hour-of-a-launch",
+  "ep": 1,
+  "section": "pumpfun",
+  "title": "What really happens in the first hour of a pump.fun launch",
+  "series": "Open dataset: 28,327 pump.fun launches, CC BY 4.0",
+  "excerpt": "Two months of pump.fun launches with a real first 15 minutes: how often they reach 2x, 5x and 10x, how front-loaded volume is, and when peaks happen.",
+  "minutes": 3
  }
 ]

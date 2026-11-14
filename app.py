@@ -74,20 +74,25 @@ def binomial_pmf(n, k, p):
 import json  # noqa: E402
 from flask import abort  # noqa: E402
 
+SECTIONS = {"robinhood": "Robinhood Chain", "bnb": "BNB Chain", "pumpfun": "pump.fun"}
 RESEARCH_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "research")
 
 
 def _research_index():
     try:
         with open(os.path.join(RESEARCH_DIR, "index.json"), encoding="utf-8") as f:
-            return sorted(json.load(f), key=lambda a: a["ep"])
+            arts = json.load(f)
     except (OSError, ValueError):
         return []
+    for a in arts:
+        a.setdefault("section", "bnb")
+        a["section_name"] = SECTIONS.get(a["section"], a["section"])
+    return sorted(arts, key=lambda a: (list(SECTIONS).index(a["section"]) if a["section"] in SECTIONS else 99, a["ep"]))
 
 
 @app.route('/')
 def home():
-    return render_template('index.html', articles=_research_index())
+    return render_template('index.html', articles=_research_index(), sections=SECTIONS)
 
 
 @app.route('/robots.txt')
@@ -107,10 +112,12 @@ def sitemap():
 
 @app.route('/research/<slug>')
 def research_article(slug):
-    arts = _research_index()
-    pos = next((i for i, a in enumerate(arts) if a["slug"] == slug), None)
-    if pos is None:                      # only slugs from the index: no path tricks
+    every = _research_index()
+    me = next((a for a in every if a["slug"] == slug), None)
+    if me is None:                       # only slugs from the index: no path tricks
         abort(404)
+    arts = [a for a in every if a["section"] == me["section"]]
+    pos = arts.index(me)
     with open(os.path.join(RESEARCH_DIR, slug + ".html"), encoding="utf-8") as f:
         body = f.read()
     return render_template('article.html', a=arts[pos], body=body,

@@ -1,0 +1,84 @@
+<p>I spent two months collecting every Solana pump.fun launch that got a real
+first 15 minutes of trading: at least 25 trades and about
+$15,000 market cap by the quarter-hour mark. That is
+<strong>28,327 launches</strong> between 2026-07-27 and 2026-09-25, with
+a 5-hour peak-price label on each one. The dataset and the notebook that
+builds the charts are public under CC BY 4.0: see the links at the bottom.</p>
+<p>Here is what the numbers say.</p>
+<figure><img src="/static/research/pumpfun/01_launches_per_day.png" alt="Qualifying Solana launches per day" loading="lazy"><figcaption>Qualifying Solana launches per day</figcaption></figure>
+
+<h2>1. The 2x line is where it gets interesting</h2>
+<p>27.1% of qualifying launches reached at least a 2x peak
+within 5 hours of entry. 5.1% reached 5x,
+1.5% reached 10x, and 0.12% reached
+50x. The distribution looks like a classic power law: most launches barely
+move after the first fifteen minutes, a thin tail runs very hard. If you
+draw the survival curve on a log x-axis, every doubling of the target cuts
+the survivor share by a roughly constant factor.</p>
+<p>That shape has one practical consequence: the median return is not where
+the money is. The thin tail is.</p>
+<figure><img src="/static/research/pumpfun/04_multiple_survival.png" alt="Share of launches reaching each peak multiple within 5 hours" loading="lazy"><figcaption>Share of launches reaching each peak multiple within 5 hours</figcaption></figure>
+<figure><img src="/static/research/pumpfun/03_peak_mcap_distribution.png" alt="Peak market cap within 5 hours" loading="lazy"><figcaption>Peak market cap within 5 hours</figcaption></figure>
+
+<h2>2. Volume is heavily front-loaded, and buy pressure drops with age</h2>
+<p>Launches do most of their first-15-minute work in the opening five minutes:
+median 5-minute volume is about $56,822 and median
+15-minute volume is only $104,191. That matches what
+anyone watching pump.fun sees live, but the ratio is remarkably stable
+across the whole sample.</p>
+<p>The buy share of volume starts high and drifts. Median buy share in the
+first 15 minutes is 62%, with a thick tail above
+80% (the obvious "pumped" launches) and a smaller tail below 20% (dumped).</p>
+<figure><img src="/static/research/pumpfun/05_buy_pressure.png" alt="Buy share of volume in the first 15 minutes" loading="lazy"><figcaption>Buy share of volume in the first 15 minutes</figcaption></figure>
+
+<h2>3. Trade count and peak multiple are related, but not strongly</h2>
+<p>Hex-binning trades in the first 15 minutes against peak multiple in 5 hours
+shows a wide cloud. There IS a positive slope: launches that traded
+thousands of times early are over-represented in the 10x+ bucket. But the
+cloud is wide enough that trade count alone is a weak signal. Most 10x+
+launches are not in the top decile of early trades, and plenty of
+high-trade launches did nothing.</p>
+<figure><img src="/static/research/pumpfun/06_trades_vs_peak.png" alt="First-15-minute trades vs peak multiple" loading="lazy"><figcaption>First-15-minute trades vs peak multiple</figcaption></figure>
+
+<h2>4. Launch timing follows the market, not the calendar</h2>
+<p>Launches are roughly evenly distributed across UTC hours, with a visible
+sag during Asian late-night and a bump around the US open. Day-of-week is
+flat. If you picked a random hour to go hunting, the hours around 14:00 to
+20:00 UTC gave you the most candidates to look at.</p>
+<figure><img src="/static/research/pumpfun/02_launches_by_hour.png" alt="Launches by hour of day (UTC)" loading="lazy"><figcaption>Launches by hour of day (UTC)</figcaption></figure>
+
+<h2>5. "Peak within 5 hours" is a short game</h2>
+<p>The vast majority of 5-hour peak prices land in the first hour after
+entry. Holding past that point rarely added to the peak: it mostly fed
+drawdown. The 5-hour window is enough to capture the up-leg for almost
+every launch that was going to move.</p>
+<h2>What this is useful for</h2>
+<p>This is a public dataset of outcomes, not a strategy. The use cases I had
+in mind:</p>
+<ul>
+<li><strong>Base rates</strong> for pump.fun launches above the gate, so anyone building
+  a model has a baseline.</li>
+<li><strong>Hour-of-day effects</strong> for people trying to time publishing or trading.</li>
+<li><strong>Feature engineering</strong>: buy/sell imbalance, acceleration between the
+  5-minute and 15-minute windows, early-trade concentration.</li>
+<li><strong>Holding-period studies</strong>: how much of the 5-hour peak is captured by
+  shorter holds.</li>
+</ul>
+<h2>Limitations</h2>
+<ul>
+<li>1-minute granularity: intra-minute spikes are not resolved.</li>
+<li>Public pump.fun launchpad only.</li>
+<li>The gate (25 trades, ~$15k mcap by +15:00) is a filter, so numbers
+  describe launches <em>that already had a first 15 minutes</em>, not every mint.</li>
+<li>The label uses 1-minute bar highs, so wicks count.</li>
+</ul>
+<h2>Get the data</h2>
+<ul>
+<li>Dataset and notebook on GitHub: <a href="https://github.com/Erin-Blockchain/solana-launches-public">github.com/Erin-Blockchain/solana-launches-public</a></li>
+<li>Dataset on Kaggle: <a href="https://www.kaggle.com/erinfolamiyusuf">kaggle.com/erinfolamiyusuf</a></li>
+<li>Dataset on Hugging Face: <a href="https://huggingface.co/seekal">huggingface.co/seekal</a></li>
+<li>My other work: <a href="https://seekal.fun">seekal.fun</a></li>
+</ul>
+<p>If you build something with this, tell me on X or open an issue. I will
+update the dataset periodically.</p>
+<p>License: CC BY 4.0. Attribute to Erin, seekal.fun.</p>

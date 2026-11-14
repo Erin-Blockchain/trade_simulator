@@ -69,6 +69,10 @@
         article table { width: 100%; border-collapse: collapse; margin: 0 0 18px; font-size: 14px; display: block; overflow-x: auto; }
         article th, article td { border: 1px solid var(--border-color); padding: 8px 10px; text-align: left; }
         article th { background: var(--bg-card); color: var(--text-main); font-family: var(--font-mono); font-size: 12px; }
+        .sec-robinhood { color: #ccff00; } .sec-bnb { color: #f0b90b; } .sec-pumpfun { color: #53fc18; }
+        article figure { margin: 8px 0 26px; }
+        article figure img { width: 100%; border: 1px solid var(--border-color); border-radius: 8px; display: block; }
+        article figcaption { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-top: 6px; }
         .math { margin: 6px 0 20px; overflow-x: auto; color: var(--text-main); font-size: 17px; }
         .pager { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 44px; }
         .pager a { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;
@@ -93,13 +97,13 @@
     <main>
         <a class="back" href="/#research">← All research</a>
         <img class="hero" src="{{ url_for('static', filename='research/' ~ a.slug ~ '.png') }}" alt="{{ a.title }}">
-        <div class="meta">EP {{ '%02d' % a.ep }} · {{ a.minutes }} min read</div>
+        <div class="meta sec-{{ a.section }}">{{ a.section_name | upper }}{% if a.section == 'bnb' %} · EP {{ '%02d' % a.ep }}{% endif %} · {{ a.minutes }} min read</div>
         <h1>{{ a.title }}</h1>
         {% if a.series %}<div class="series">{{ a.series }}</div>{% endif %}
         <article>{{ body | safe }}</article>
         <div class="pager">
-            {% if prev %}<a href="/research/{{ prev.slug }}"><span>← EP {{ '%02d' % prev.ep }}</span>{{ prev.title }}</a>{% endif %}
-            {% if next %}<a class="next" href="/research/{{ next.slug }}"><span>EP {{ '%02d' % next.ep }} →</span>{{ next.title }}</a>{% endif %}
+            {% if prev %}<a href="/research/{{ prev.slug }}"><span>← Previous</span>{{ prev.title }}</a>{% endif %}
+            {% if next %}<a class="next" href="/research/{{ next.slug }}"><span>Next →</span>{{ next.title }}</a>{% endif %}
         </div>
     </main>
 </body>

@@ -491,6 +491,18 @@
             position: relative;
             padding-left: 16px;
         }
+        .research-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
+        .rf-btn { background: var(--bg-card); color: var(--text-muted); border: 1px solid var(--border-color);
+                  font-family: var(--font-mono); font-size: 12px; padding: 7px 14px; border-radius: 6px; cursor: pointer; }
+        .rf-btn:hover { color: var(--text-main); }
+        .rf-btn.active { color: var(--neon-green); border-color: var(--neon-green); }
+        .research-section { margin-top: 26px; }
+        .research-section-title { font-family: var(--font-mono); font-size: 15px; font-weight: 700; letter-spacing: 0.5px; }
+        .research-section-title span { color: var(--text-muted); font-weight: 400; margin-left: 6px; }
+        .research-empty { color: var(--text-muted); font-size: 13px; margin-top: 10px; }
+        .sec-robinhood { color: #ccff00 !important; }
+        .sec-bnb { color: #f0b90b !important; }
+        .sec-pumpfun { color: #53fc18 !important; }
         .research-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -813,22 +825,37 @@
             <div class="intel-hero-card">
                 <div class="intel-hero-title">📚 SEEKAL // RESEARCH</div>
                 <div class="intel-hero-desc">
-                    Beyond Prediction: building, testing and improving a machine-learning trading system.
-                    Practical notes on evaluation, features, validation and risk, one topic per episode.
+                    On-chain research by chain: open datasets, market observations, and practical notes on
+                    building, testing and improving machine-learning trading systems.
                 </div>
             </div>
+            <div class="research-filters">
+                <button class="rf-btn active" data-sec="all" onclick="filterResearch('all', this)">ALL</button>
+                {% for key, name in sections.items() %}
+                <button class="rf-btn" data-sec="{{ key }}" onclick="filterResearch('{{ key }}', this)">{{ name | upper }}</button>
+                {% endfor %}
+            </div>
+            {% for key, name in sections.items() %}
+            {% set sec_arts = articles | selectattr('section', 'equalto', key) | list %}
+            <div class="research-section" data-sec="{{ key }}">
+            <div class="research-section-title sec-{{ key }}">{{ name }} <span>{{ sec_arts | length }}</span></div>
+            {% if not sec_arts %}
+            <div class="research-empty">Coming soon.</div>
+            {% endif %}
             <div class="research-grid">
-                {% for a in articles %}
+                {% for a in sec_arts %}
                 <a class="research-card" href="/research/{{ a.slug }}">
                     <img src="{{ url_for('static', filename='research/' ~ a.slug ~ '.png') }}" alt="{{ a.title }}" loading="lazy">
                     <div class="research-card-body">
-                        <div class="research-meta">EP {{ '%02d' % a.ep }} · {{ a.minutes }} min read</div>
+                        <div class="research-meta sec-{{ a.section }}">{% if a.section == 'bnb' %}EP {{ '%02d' % a.ep }}{% else %}{{ a.section_name | upper }}{% endif %} · {{ a.minutes }} min read</div>
                         <div class="research-title">{{ a.title }}</div>
                         <div class="research-excerpt">{{ a.excerpt }}</div>
                     </div>
                 </a>
                 {% endfor %}
             </div>
+            </div>
+            {% endfor %}
         </div>
     </div>
 
@@ -1180,6 +1207,13 @@
                 sidebar.style.display = 'none';
                 container.classList.add('no-sidebar');
             }
+        }
+
+        function filterResearch(sec, btn) {
+            document.querySelectorAll('.rf-btn').forEach(b => b.classList.toggle('active', b === btn));
+            document.querySelectorAll('.research-section').forEach(el => {
+                el.style.display = (sec === 'all' || el.dataset.sec === sec) ? '' : 'none';
+            });
         }
 
         window.onload = () => {
