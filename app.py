@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 import math
+import heapq
 import os
 import sys
 import threading
@@ -33,7 +34,14 @@ import rh_backfill_v2 as V2
 
 # Tracks background job states: {job_id: {"status": "processing"|"completed"|"error", "result": {...}}}
 JOB_STORE = {}
-background_executor = ThreadPoolExecutor(max_workers=2)
+TIMELINE_STORE = {}
+TIMELINE_STORE_MAX = 50
+background_executor = ThreadPoolExecutor(max_workers=8)
+# Timeline calculation is CPU-side after the one blockchain replay. Keep it on
+# a separate, bounded lane so it cannot delay the primary intelligence result.
+timeline_executor = ThreadPoolExecutor(max_workers=1)
+_timeline_slots = threading.BoundedSemaphore(2)
+_timeline_lock = threading.Lock()
 app = Flask(__name__)
 
 LAUNCH_TOPIC = ("0x8d4aad4953d0ca700d468f3753aa14432d1b35b43ec6409f051f"
@@ -277,7 +285,7 @@ class _Const(dict):
     def get(self, *_a, **_k): return self._v
 
 
-def rh_intel(token, age_min):
+def rh_intel(token, age_min, return_timeline_data=False):
     lblock, curve, deployer = _find_launch(token)
     if lblock is None:
         raise LookupError("Launch event not found for this token.")
@@ -371,6 +379,16 @@ def rh_intel(token, age_min):
     }
     if capped:
         out["note"] = f"Coin is only {coin_age_now_min:.1f} min old; showing data at its current age."
+    if return_timeline_data:
+        timeline_state = {
+            "token": token.lower(), "rows": [dict(r) for r in rows], "transfers": trs,
+            "launch_ts": launch_ts, "end_ts": end_ts, "launch_block": lblock,
+            "target_block": b_end, "curve": curve, "deployer": deployer,
+            "factory": factory, "pair": pair, "launched": lt,
+            "quote_price": qprice, "quote_scale": qscale,
+            "final_metrics": dict(out),
+        }
+        return out, timeline_state
     return out
 
 
@@ -508,7 +526,7 @@ def _bsc_launch(pool, store, token):
     return L
 
 
-def bsc_intel(token, age_min):
+def bsc_intel(token, age_min, return_timeline_data=False):
     """The collector's steps (bsc_core._stage_30) with the end moment set to
     launch + age instead of +30:00; no gate. Any age, up to the coin's current
     age (like Robinhood). Every number comes from the collector's own functions."""
@@ -593,7 +611,464 @@ def bsc_intel(token, age_min):
     }
     if capped:
         out["note"] = f"Coin is only {coin_age_now_min:.1f} min old; showing data at its current age."
+    if return_timeline_data:
+        timeline_state = {
+            "token": tok, "rows": wt, "transfers": trs,
+            "launch": L, "launch_ts": lu, "end_ts": end_ts,
+            "launch_block": lb, "target_block": b_end,
+            "dev": dev, "grad": g, "quote_usd": q,
+            "final_metrics": dict(out),
+        }
+        return out, timeline_state
     return out
+
+
+# =========================================================================== #
+# Historical timeline: calculate every minute/hour from the SAME event replay.
+# No repeated per-minute blockchain scans are performed.
+# =========================================================================== #
+TIMELINE_MAX_POINTS = 1500
+
+
+class TimelineLimitError(ValueError):
+    """The requested resolution would create an impractically large chart."""
+
+
+def _timeline_transfer_groups(transfers, block_timestamps):
+    """Collapse ERC-20 transfer logs by transaction while preserving event order."""
+    by_tx = {}
+    for item in transfers:
+        blk, frm, to, amount, tx, li = item
+        tx = str(tx).lower()
+        group = by_tx.get(tx)
+        if group is None:
+            group = {
+                "tx": tx, "block": int(blk), "ts": block_timestamps[int(blk)],
+                "events": [], "net": defaultdict(int), "mint_total": 0,
+                "mint_to": defaultdict(int),
+            }
+            by_tx[tx] = group
+        group["events"].append(item)
+        frm, to, amount = frm.lower(), to.lower(), int(amount)
+        group["net"][frm] -= amount
+        group["net"][to] += amount
+        if frm == C.ZERO:
+            group["mint_total"] += amount
+            group["mint_to"][to] += amount
+    groups = list(by_tx.values())
+    groups.sort(key=lambda g: (g["block"], min(int(e[5]) for e in g["events"])))
+    for group in groups:
+        group["net"] = dict(group["net"])
+        group["mint_to"] = dict(group["mint_to"])
+    return groups, by_tx
+
+
+def _timeline_ages(effective_age_min, unit):
+    step = 1.0 if unit == "min" else 60.0
+    ages = [0.0]
+    whole_steps = int(effective_age_min // step)
+    ages.extend(i * step for i in range(1, whole_steps + 1))
+    if effective_age_min > 0 and abs(ages[-1] - effective_age_min) > 1e-7:
+        ages.append(float(effective_age_min))
+    if len(ages) > TIMELINE_MAX_POINTS:
+        guidance = (
+            "Select Hours to view a longer history."
+            if unit == "min" else
+            "This history is too long for the current hourly chart limit."
+        )
+        raise TimelineLimitError(
+            f"This {unit}-by-{unit} timeline would contain {len(ages)-1:,} intervals. "
+            f"The chart limit is {TIMELINE_MAX_POINTS:,} points. {guidance}"
+        )
+    return ages
+
+
+def _heap_top_k_total(heap, versions, values, k):
+    """Sum the k largest current values using a versioned lazy max-heap."""
+    selected = []
+    while heap and len(selected) < k:
+        item = heapq.heappop(heap)
+        neg_value, address, version = item
+        if (versions.get(address) == version
+                and values.get(address) == -neg_value):
+            selected.append(item)
+    total = sum(-item[0] for item in selected)
+    for item in selected:
+        heapq.heappush(heap, item)
+
+    # Bound stale heap growth after frequently updated wallets.
+    if len(heap) > max(4096, 4 * len(values) + 100):
+        heap[:] = [(-value, address, versions.get(address, 0))
+                   for address, value in values.items()]
+        heapq.heapify(heap)
+    return total
+
+
+def _timeline_snapshot(positive, balances, supply, dev, unique_buyers,
+                       repeat_pct, top5_share, top10_raw, buy_vol, sell_vol,
+                       n_buys, n_sells, trades, largest_buy, largest_sell,
+                       liquidity):
+    dev_balance = max(int(balances.get(dev, 0)), 0) if dev else 0
+    denom = max(float(supply), 0.0)
+    return {
+        "holders": len(positive),
+        "top10_pct": round(top10_raw / denom * 100, 4) if denom else 0.0,
+        "dev_pct": round(dev_balance / denom * 100, 4) if denom else 0.0,
+        "avg_buy_usd": round(buy_vol / n_buys, 2) if n_buys else 0.0,
+        "avg_sell_usd": round(sell_vol / n_sells, 2) if n_sells else 0.0,
+        "n_buys": n_buys, "n_sells": n_sells, "trades": trades,
+        "unique_buyers": len(unique_buyers),
+        "repeat_buyer_pct": round(repeat_pct, 4),
+        "liquidity_usd": round(max(float(liquidity), 0.0), 2),
+        "largest_buy_usd": round(largest_buy, 2),
+        "largest_sell_usd": round(largest_sell, 2),
+        "top5_buyer_share_pct": round(top5_share, 4),
+    }
+
+
+def _build_timeline_from_state(chain, state, requested_age_min, unit):
+    token = state["token"].lower()
+    launch_ts = int(state["launch_ts"])
+    end_ts = int(state["end_ts"])
+    effective_age_min = max(0.0, min(float(requested_age_min), (end_ts - launch_ts) / 60.0))
+    ages = _timeline_ages(effective_age_min, unit)
+
+    rows = [dict(r) for r in state["rows"]]
+    transfers = state["transfers"]
+
+    if chain == "robinhood":
+        needed = {int(r["block"]) for r in rows}
+        needed.update(int(t[0]) for t in transfers)
+        bt = CS.block_timestamp_batch(_rpc_solid, sorted(needed))
+        for blk in sorted(needed):
+            if bt.get(blk) is None:
+                bt[blk] = CS._block_ts_req(_rpc_solid, blk)
+        for row in rows:
+            row["t"] = bt[int(row["block"])]
+
+        launched = state["launched"] or {}
+        pair = state["pair"].lower()
+        qprice, qscale = float(state["quote_price"]), float(state["quote_scale"])
+        curve, deployer, factory = state["curve"].lower(), state["deployer"].lower(), state["factory"].lower()
+        pm, hook = CS.V4_POOL_MANAGER.lower(), CS.V4_MEME_HOOK.lower()
+        holder_system_base = set(HF.DEAD) | {curve, token, HF.V4_POOL_MANAGER, factory, deployer}
+        buyer_system_base = set(V2.DEAD) | {token, curve, pm, hook, factory}
+        top5_skip_base = buyer_system_base | {curve, pm}
+        first_v4_ts = min((int(r["t"]) for r in rows if r.get("venue") == "v4"), default=None)
+
+        v4_logs = []
+        fee, tick = launched.get("poolFee"), launched.get("tickSpacing")
+        if first_v4_ts is not None and fee is not None and tick is not None:
+            pool_id = CS.compute_pool_id(token, pair, fee, tick)
+            v4_logs = CS.v4_swap_logs(
+                _rpc_solid, pool_id, int(state["launch_block"]), int(state["target_block"]),
+                log_chunk=10000, pause=0.0
+            ) or []
+            v4_logs.sort(key=lambda lg: (int(lg["blockNumber"], 16), int(lg.get("logIndex", "0x0"), 16)))
+            v4_blocks = {int(lg["blockNumber"], 16) for lg in v4_logs}
+            v4_bt = CS.block_timestamp_batch(_rpc_solid, sorted(v4_blocks))
+            for blk in sorted(v4_blocks):
+                if v4_bt.get(blk) is None:
+                    v4_bt[blk] = CS._block_ts_req(_rpc_solid, blk)
+            for lg in v4_logs:
+                lg["_seekal_ts"] = v4_bt[int(lg["blockNumber"], 16)]
+
+        def venues_at(ts):
+            return {curve} | ({pm} if first_v4_ts is not None and ts >= first_v4_ts else set())
+
+        supply_fixed = HF.SUPPLY
+        dev = deployer
+        zero_address = HF.ZERO
+        dynamic_system_base = holder_system_base
+    else:
+        pool, store, _pricer = _bsc()
+        transfer_blocks = sorted({int(t[0]) for t in transfers})
+        transfer_bt = C.block_times(pool, transfer_blocks) if transfer_blocks else {}
+        bt = transfer_bt
+        dev = (state["dev"] or "").lower()
+        qprice = float(state["quote_usd"])
+        grad = state.get("grad")
+        grad_ts = bsc_block_ts(pool, int(grad["block"])) if grad else None
+        pm = None
+        holder_system_base = {C.ZERO, C.DEAD, token, C.PORTAL, C.VAULT_PORTAL, C.TAX_TOKEN_HELPER, dev}
+        buyer_system_base = {C.ZERO, C.DEAD, token, C.PORTAL, C.VAULT_PORTAL, C.TAX_TOKEN_HELPER}
+        top5_skip_base = {C.ZERO, C.DEAD, token, C.PORTAL, C.VAULT_PORTAL, C.TAX_TOKEN_HELPER}
+        dynamic_system_base = holder_system_base
+        zero_address = C.ZERO
+
+        # BSC rows have their real event timestamps filled by FN._times in bsc_intel.
+        for row in rows:
+            if row.get("t") is None:
+                row["t"] = C.block_times(pool, [int(row["block"])])[int(row["block"])]
+
+        def venues_at(ts):
+            if grad and grad_ts is not None and ts >= grad_ts:
+                return {C.PORTAL, str(grad["pool"]).lower()}
+            return {C.PORTAL}
+
+    rows.sort(key=lambda r: (int(r.get("t") or launch_ts), int(r.get("block", 0)), int(r.get("li", 0))))
+    transfer_timestamps = (bt if chain == "robinhood" else transfer_bt)
+    groups, groups_by_tx = _timeline_transfer_groups(transfers, transfer_timestamps)
+
+    balances = defaultdict(int)
+    positive = {}
+    holder_heap = []
+    holder_versions = defaultdict(int)
+    unique_buyers = set()
+    repeat_counts = Counter()
+    repeat_buyer_total = 0
+    repeat_buyer_ge2 = 0
+    buyer_volumes = defaultdict(float)
+    buyer_vol_heap = []
+    buyer_vol_versions = defaultdict(int)
+    buyer_volume_total = 0.0
+    buy_vol = sell_vol = 0.0
+    n_buys = n_sells = trades = 0
+    largest_buy = largest_sell = 0.0
+    curve_net = 0.0
+    latest_bsc_row = None
+    v4_idx = 0
+    latest_v4_log = None
+    row_idx = group_idx = 0
+    minted = destroyed = 0
+    current_tax_holders = set()
+    points = []
+
+    active_venues = set(venues_at(launch_ts))
+
+    def remove_excluded(addresses):
+        for address in addresses:
+            if address in positive:
+                positive.pop(address, None)
+                holder_versions[address] += 1
+
+    def apply_balance(address, delta, venues):
+        old = balances.get(address, 0)
+        new = old + int(delta)
+        balances[address] = new
+        holder_versions[address] += 1
+        version = holder_versions[address]
+        if (address in dynamic_system_base or address in venues
+                or address in current_tax_holders):
+            positive.pop(address, None)
+        elif new > 0:
+            positive[address] = new
+            heapq.heappush(holder_heap, (-new, address, version))
+        else:
+            positive.pop(address, None)
+
+    for elapsed_min in ages:
+        target_ts = launch_ts + int(round(elapsed_min * 60))
+
+        while group_idx < len(groups) and int(groups[group_idx]["ts"]) <= target_ts:
+            group = groups[group_idx]
+            group_ts = int(group["ts"])
+            venues = venues_at(group_ts)
+            newly_active_venues = venues - active_venues
+            if newly_active_venues:
+                remove_excluded(newly_active_venues)
+            active_venues.update(newly_active_venues)
+
+            for _blk, frm, to, amount, _tx, _li in group["events"]:
+                frm, to, amount = frm.lower(), to.lower(), int(amount)
+                if chain == "bsc" and frm == token:
+                    current_tax_holders.add(to)
+                    if to in positive:
+                        positive.pop(to, None)
+                        holder_versions[to] += 1
+                if frm == zero_address:
+                    minted += amount
+                if to == zero_address and frm != zero_address:
+                    destroyed += amount
+                apply_balance(frm, -amount, venues)
+                apply_balance(to, amount, venues)
+
+            net = group["net"]
+            net_venues = sum(int(net.get(v, 0)) for v in venues)
+            cands = [(int(n), a) for a, n in net.items() if int(n) > 0 and a not in (buyer_system_base | venues)]
+            buyer = max(cands)[1] if cands else None
+
+            if chain == "robinhood":
+                unique_condition = (-net_venues + int(group["mint_total"])) > 0
+            else:
+                minted_into_venues = sum(int(group["mint_to"].get(v, 0)) for v in venues)
+                unique_condition = (-net_venues + minted_into_venues) > 0
+            if unique_condition and buyer:
+                unique_buyers.add(buyer)
+            if -net_venues > 0 and buyer:
+                old_count = repeat_counts[buyer]
+                repeat_counts[buyer] = old_count + 1
+                if old_count == 0:
+                    repeat_buyer_total += 1
+                elif old_count == 1:
+                    repeat_buyer_ge2 += 1
+
+            group_idx += 1
+
+        # Process all trade rows at or before this snapshot after transfer
+        # transaction nets are available for exact buyer attribution.
+        while row_idx < len(rows) and int(rows[row_idx].get("t") or launch_ts) <= target_ts:
+            row = rows[row_idx]
+            row_time = int(row.get("t") or launch_ts)
+            venues = venues_at(row_time)
+            tx = str(row.get("tx") or "").lower()
+            group = groups_by_tx.get(tx)
+            net = group["net"] if group else {}
+            side = row["side"]
+            amount_usd = float(row.get("quote_usd") or 0.0)
+            if side == "buy":
+                buy_vol += amount_usd
+                n_buys += 1
+                largest_buy = max(largest_buy, amount_usd)
+                candidates = [
+                    (int(n), a) for a, n in net.items()
+                    if int(n) > 0 and a not in top5_skip_base and a not in venues
+                    and (chain != "bsc" or a not in current_tax_holders)
+                ]
+                if candidates:
+                    buyer = max(candidates)[1]
+                    new_buyer_volume = buyer_volumes[buyer] + amount_usd
+                    buyer_volumes[buyer] = new_buyer_volume
+                    buyer_volume_total += amount_usd
+                    buyer_vol_versions[buyer] += 1
+                    heapq.heappush(
+                        buyer_vol_heap,
+                        (-new_buyer_volume, buyer, buyer_vol_versions[buyer])
+                    )
+            else:
+                sell_vol += amount_usd
+                n_sells += 1
+                largest_sell = max(largest_sell, amount_usd)
+
+            trades += 1
+            if chain == "robinhood":
+                if row.get("venue") == "curve":
+                    q = float(row.get("net_quote_usd", row.get("quote_usd", 0.0)))
+                    curve_net += q if side == "buy" else -q
+            else:
+                latest_bsc_row = row
+            row_idx += 1
+
+        if chain == "robinhood":
+            while v4_idx < len(v4_logs) and int(v4_logs[v4_idx]["_seekal_ts"]) <= target_ts:
+                latest_v4_log = v4_logs[v4_idx]
+                v4_idx += 1
+            has_v4_trade = first_v4_ts is not None and target_ts >= first_v4_ts
+            if has_v4_trade and latest_v4_log is not None and fee is not None and tick is not None:
+                quote_side = CS.v4_eth_side_at(latest_v4_log, token, pair) * (1e18 / qscale)
+                liquidity = 2.0 * quote_side * qprice
+            else:
+                liquidity = 2.0 * max(curve_net, 0.0)
+            supply = supply_fixed
+        else:
+            liquidity = (2.0 * float(latest_bsc_row.get("reserve_q", 0.0)) * qprice
+                         if latest_bsc_row else 0.0)
+            supply = max(float(minted - destroyed), 0.0)
+
+        # A venue can become a system address at graduation/migration even when
+        # no token transfer occurs at that exact snapshot boundary.
+        snapshot_venues = venues_at(target_ts)
+        newly_active_venues = snapshot_venues - active_venues
+        if newly_active_venues:
+            remove_excluded(newly_active_venues)
+            active_venues.update(newly_active_venues)
+
+        top10_raw = _heap_top_k_total(holder_heap, holder_versions, positive, 10)
+        repeat_pct = (100.0 * repeat_buyer_ge2 / repeat_buyer_total
+                      if repeat_buyer_total else 0.0)
+        top5_volume = _heap_top_k_total(
+            buyer_vol_heap, buyer_vol_versions, buyer_volumes, 5
+        )
+        top5_share = (100.0 * top5_volume / buyer_volume_total
+                      if buyer_volume_total else 0.0)
+        snap = _timeline_snapshot(
+            positive, balances, supply, dev, unique_buyers,
+            repeat_pct, top5_share, top10_raw, buy_vol, sell_vol,
+            n_buys, n_sells, trades, largest_buy, largest_sell, liquidity
+        )
+        x = elapsed_min if unit == "min" else elapsed_min / 60.0
+        label = f"{x:g} {'min' if unit == 'min' else 'hr'}"
+        points.append({"x": round(x, 4), "age_min": round(elapsed_min, 4), "label": label, **snap})
+
+    final = state.get("final_metrics") or {}
+    if points and final:
+        final_fields = {
+            "holders": "holders",
+            "top10_pct": "top10_pct",
+            "dev_pct": "dev_pct",
+            "avg_buy_usd": "avg_buy_usd",
+            "avg_sell_usd": "avg_sell_usd",
+            "n_buys": "n_buys",
+            "n_sells": "n_sells",
+            "trades": "trades",
+            "unique_buyers": "unique_buyers",
+            "repeat_buyer_pct": "repeat_buyer_pct",
+            "liquidity_usd": "liquidity_usd",
+            "largest_buy_usd": "largest_buy_usd",
+            "largest_sell_usd": "largest_sell_usd",
+        }
+        for chart_field, result_field in final_fields.items():
+            if result_field in final:
+                points[-1][chart_field] = final[result_field]
+        if "top5_buyer_share" in final:
+            points[-1]["top5_buyer_share_pct"] = round(
+                float(final["top5_buyer_share"] or 0.0) * 100.0, 4
+            )
+
+    return {
+        "status": "completed", "chain": chain, "unit": unit,
+        "x_label": "Minutes since launch" if unit == "min" else "Hours since launch",
+        "points": points,
+    }
+
+
+def _set_timeline_entry(job_key, entry):
+    """Refresh a timeline entry and keep this in-memory cache bounded."""
+    with _timeline_lock:
+        TIMELINE_STORE.pop(job_key, None)
+        TIMELINE_STORE[job_key] = entry
+        while len(TIMELINE_STORE) > TIMELINE_STORE_MAX:
+            oldest_key = next(iter(TIMELINE_STORE))
+            if oldest_key == job_key and len(TIMELINE_STORE) > 1:
+                oldest_key = next(key for key in TIMELINE_STORE if key != job_key)
+            TIMELINE_STORE.pop(oldest_key, None)
+            JOB_STORE.pop(oldest_key, None)
+
+
+def _run_timeline_job(job_key, chain, state, age_min, unit):
+    try:
+        result = _build_timeline_from_state(chain, state, age_min, unit)
+        _set_timeline_entry(job_key, {"status": "completed", "result": result})
+    except TimelineLimitError as exc:
+        _set_timeline_entry(job_key, {"status": "error", "message": str(exc)})
+    except Exception:
+        import traceback
+        print(f"[intel-timeline] {chain} {state.get('token')} failed:", flush=True)
+        traceback.print_exc()
+        _set_timeline_entry(job_key, {
+            "status": "error",
+            "message": "The snapshot is ready, but its timeline could not be generated."
+        })
+    finally:
+        _timeline_slots.release()
+
+
+def _queue_timeline_job(job_key, chain, state, age_min, unit):
+    _set_timeline_entry(job_key, {"status": "processing"})
+    if not _timeline_slots.acquire(blocking=False):
+        _set_timeline_entry(job_key, {
+            "status": "error",
+            "message": "The timeline queue is busy. The snapshot is ready; please run the query again for its graph."
+        })
+        return
+    try:
+        timeline_executor.submit(_run_timeline_job, job_key, chain, state, age_min, unit)
+    except Exception:
+        _timeline_slots.release()
+        _set_timeline_entry(job_key, {
+            "status": "error",
+            "message": "The snapshot is ready, but its timeline could not be queued."
+        })
 
 
 # =========================================================================== #
@@ -612,20 +1087,30 @@ def intel():
         data = request.json or {}
         token = (data.get('token') or '').strip().lower()
         chain = (data.get('chain') or 'robinhood').lower()
-        unit = (data.get('unit') or 'min').lower()
+        raw_unit = (data.get('unit') or 'min').lower()
+        if raw_unit in ('hour', 'hours', 'hr', 'h'):
+            unit = 'hour'
+        elif raw_unit in ('min', 'minute', 'minutes'):
+            unit = 'min'
+        else:
+            return jsonify({"error": "Choose minutes or hours."}), 400
         try:
             age = float(data.get('age', 15))
         except (TypeError, ValueError):
-            age = 15.0
+            return jsonify({"error": "Enter a valid age."}), 400
+        if not math.isfinite(age) or age <= 0:
+            return jsonify({"error": "Age must be greater than 0."}), 400
 
-        age_min = age * 60 if unit in ('hour', 'hours', 'hr', 'h') else age
-        job_key = f"{chain}_{token}_{age_min}"      # chain in the key: same address, other chain
+        age_min = age * 60 if unit == 'hour' else age
+        job_key = f"{chain}_{token}_{age_min}_{unit}"
 
         # 1. Return completed data instantly if cached
         if job_key in JOB_STORE and JOB_STORE[job_key].get("status") == "completed":
             res = JOB_STORE[job_key]["result"]
             if res.get("note"):          # "showing its current age": recompute next time
                 del JOB_STORE[job_key]
+                with _timeline_lock:
+                    TIMELINE_STORE.pop(job_key, None)
             return jsonify(res)
 
         # 2. If a background job is actively running, tell the frontend to keep waiting
@@ -654,9 +1139,11 @@ def intel():
         def run_background_job():
             try:
                 fn = bsc_intel if chain == "bsc" else rh_intel
+                metrics, timeline_state = fn(token, age_min, return_timeline_data=True)
                 out = {"token": token, "chain": chain, "unit": unit,
-                       "age": age, "age_min": age_min, **fn(token, age_min)}
+                       "age": age, "age_min": age_min, **metrics}
                 JOB_STORE[job_key] = {"status": "completed", "result": out}
+                _queue_timeline_job(job_key, chain, timeline_state, age_min, unit)
             except LookupError as e:          # our own plain-language messages
                 JOB_STORE[job_key] = {"status": "error", "message": str(e)}
             except C.Skip as e:
@@ -678,6 +1165,36 @@ def intel():
         import traceback
         traceback.print_exc()
         return jsonify({"error": GENERIC_ERROR}), 500
+
+
+@app.route('/api/intel/timeline', methods=['POST'])
+def intel_timeline():
+    """Return a separately generated timeline for a completed snapshot query."""
+    data = request.json or {}
+    token = (data.get('token') or '').strip().lower()
+    chain = (data.get('chain') or 'robinhood').lower()
+    unit = (data.get('unit') or 'min').lower()
+    try:
+        age = float(data.get('age', 15))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid age."}), 400
+    age_min = age * 60 if unit in ('hour', 'hours', 'hr', 'h') else age
+    if chain not in SUPPORTED_CHAINS or not (token.startswith('0x') and len(token) == 42):
+        return jsonify({"error": "Invalid chain or token address."}), 400
+    if (unit not in ('min', 'minute', 'minutes', 'hour', 'hours', 'hr', 'h')
+            or not math.isfinite(age_min) or age_min <= 0):
+        return jsonify({"error": "Invalid timeline interval."}), 400
+    unit_key = 'hour' if unit in ('hour', 'hours', 'hr', 'h') else 'min'
+    job_key = f"{chain}_{token}_{age_min}_{unit_key}"
+    with _timeline_lock:
+        entry = TIMELINE_STORE.get(job_key)
+    if not entry:
+        return jsonify({"status": "waiting", "message": "Waiting for the snapshot replay to finish."}), 202
+    if entry.get("status") == "processing":
+        return jsonify({"status": "processing", "message": "Building the launch timeline."}), 202
+    if entry.get("status") == "error":
+        return jsonify({"error": entry.get("message", "Timeline could not be generated.")}), 500
+    return jsonify(entry.get("result") or {"error": "Timeline result is missing."})
 
 
 if __name__ == '__main__':

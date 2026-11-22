@@ -364,6 +364,58 @@
             box-shadow: 0 0 15px rgba(0, 255, 136, 0.15);
         }
         .chart-title { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .intel-timeline-card {
+            width: 100%;
+            min-width: 0;
+            margin-top: 16px;
+            overflow: hidden;
+        }
+        .intel-timeline-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .intel-timeline-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .intel-timeline-controls select {
+            max-width: 220px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            background: #0d1424;
+            color: #e6ecf5;
+            border: 1px solid #1c2740;
+            font-family: var(--font-mono);
+            font-size: 11px;
+        }
+        .intel-timeline-chart-wrap {
+            position: relative;
+            width: 100%;
+            height: 310px;
+            min-width: 0;
+        }
+        .intel-timeline-chart-wrap canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+        }
+        .intel-timeline-status {
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            line-height: 1.5;
+        }
+        @media (max-width: 600px) {
+            .intel-timeline-chart-wrap { height: 250px; }
+            .intel-timeline-card { padding: 13px; }
+            .intel-timeline-controls { width: 100%; }
+            .intel-timeline-controls select { width: 100%; max-width: none; }
+        }
 
         /* --- Clickable Chart Modal Popup --- */
         .chart-modal-overlay {
@@ -810,6 +862,37 @@
                 </div>
             </div>
 
+            <!-- Full-width launch-to-snapshot intelligence timeline -->
+            <div id="intel-timeline-card" class="intel-card intel-timeline-card" style="display:none;">
+                <div class="intel-timeline-header">
+                    <div class="intel-card-title" style="margin:0; flex:1;">📈 Intelligence from Launch</div>
+                    <div class="intel-timeline-controls">
+                        <label for="intel-timeline-metric" style="font-family:var(--font-mono); color:var(--text-muted); font-size:10px;">PLOT</label>
+                        <select id="intel-timeline-metric" onchange="changeIntelTimelineMetric()">
+                            <option value="holders">Holders</option>
+                            <option value="top10_pct">Top 10 Supply</option>
+                            <option value="dev_pct">Dev Holding</option>
+                            <option value="trades">Trades</option>
+                            <option value="unique_buyers">Unique Buyers</option>
+                            <option value="repeat_buyer_pct">Repeat Buyers</option>
+                            <option value="avg_buy_usd">Average Buy Size</option>
+                            <option value="avg_sell_usd">Average Sell Size</option>
+                            <option value="liquidity_usd">Liquidity</option>
+                            <option value="largest_buy_usd">Largest Buy</option>
+                            <option value="largest_sell_usd">Largest Sell</option>
+                            <option value="top5_buyer_share_pct">Top 5 Buyer Share</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="intel-timeline-status" class="intel-timeline-status">Preparing historical intervals...</div>
+                <div id="intel-timeline-chart-wrap" class="intel-timeline-chart-wrap" style="display:none;">
+                    <canvas id="intel-timeline-chart"></canvas>
+                </div>
+                <div style="font-size:10px; color:var(--text-muted); font-family:var(--font-mono);">
+                    Hover over any point to inspect the complete intelligence snapshot at that minute or hour.
+                </div>
+            </div>
+
             <!-- Paid version note -->
             <div id="intel-paid-note" style="margin-top:16px; padding:14px 18px;
                  border:1px dashed var(--neon-green,#22e39a); border-radius:10px;
@@ -866,6 +949,9 @@
         let lineChartInstance = null;
         let modalChartInstance = null;
         let lastSimulationData = null;
+        let intelTimelineChart = null;
+        let lastIntelTimelineData = null;
+        let activeTimelineTimer = null;
 
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar-controls');
@@ -887,11 +973,184 @@
             if (activeTimer) {
                 clearInterval(activeTimer);
             }
+            if (activeTimelineTimer) {
+                clearTimeout(activeTimelineTimer);
+                activeTimelineTimer = null;
+            }
             
             document.getElementById('intel-loading').style.display = 'none';
             const btn = document.getElementById('intel-btn');
             btn.disabled = false;
             btn.innerText = 'Get Intelligence ↵';
+        }
+
+        const intelTimelineMetrics = {
+            holders: { label: 'Holders', format: v => Number(v || 0).toLocaleString() },
+            top10_pct: { label: 'Top 10 Supply', format: v => Number(v || 0).toFixed(2) + '%' },
+            dev_pct: { label: 'Dev Holding', format: v => Number(v || 0).toFixed(2) + '%' },
+            trades: { label: 'Trades', format: v => Number(v || 0).toLocaleString() },
+            unique_buyers: { label: 'Unique Buyers', format: v => Number(v || 0).toLocaleString() },
+            repeat_buyer_pct: { label: 'Repeat Buyers', format: v => Number(v || 0).toFixed(2) + '%' },
+            avg_buy_usd: { label: 'Average Buy Size', format: v => '$' + Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 2 }) },
+            avg_sell_usd: { label: 'Average Sell Size', format: v => '$' + Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 2 }) },
+            liquidity_usd: { label: 'Liquidity', format: v => '$' + Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 2 }) },
+            largest_buy_usd: { label: 'Largest Buy', format: v => '$' + Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 2 }) },
+            largest_sell_usd: { label: 'Largest Sell', format: v => '$' + Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 2 }) },
+            top5_buyer_share_pct: { label: 'Top 5 Buyer Share', format: v => Number(v || 0).toFixed(2) + '%' }
+        };
+
+        function showIntelTimelineLoading() {
+            const card = document.getElementById('intel-timeline-card');
+            const status = document.getElementById('intel-timeline-status');
+            const wrap = document.getElementById('intel-timeline-chart-wrap');
+            card.style.display = '';
+            wrap.style.display = 'none';
+            status.style.display = '';
+            status.style.color = 'var(--text-muted)';
+            status.innerText = 'Building the launch-to-snapshot timeline from the collected event history...';
+            lastIntelTimelineData = null;
+            if (intelTimelineChart) {
+                intelTimelineChart.destroy();
+                intelTimelineChart = null;
+            }
+        }
+
+        function renderIntelTimeline() {
+            if (!lastIntelTimelineData || !Array.isArray(lastIntelTimelineData.points)) return;
+            const field = document.getElementById('intel-timeline-metric').value || 'holders';
+            const metric = intelTimelineMetrics[field] || intelTimelineMetrics.holders;
+            const points = lastIntelTimelineData.points;
+            const status = document.getElementById('intel-timeline-status');
+            const wrap = document.getElementById('intel-timeline-chart-wrap');
+            const canvas = document.getElementById('intel-timeline-chart');
+
+            if (intelTimelineChart) intelTimelineChart.destroy();
+            wrap.style.display = '';
+            status.style.display = 'none';
+
+            const moneyFields = new Set(['avg_buy_usd', 'avg_sell_usd', 'liquidity_usd', 'largest_buy_usd', 'largest_sell_usd']);
+            const percentFields = new Set(['top10_pct', 'dev_pct', 'repeat_buyer_pct', 'top5_buyer_share_pct']);
+            const formatAxis = value => {
+                const n = Number(value || 0);
+                if (moneyFields.has(field)) return '$' + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+                if (percentFields.has(field)) return n.toFixed(0) + '%';
+                return n.toLocaleString();
+            };
+
+            intelTimelineChart = new Chart(canvas.getContext('2d'), {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: metric.label,
+                        data: points.map(p => ({
+                            x: Number(p.x),
+                            y: Number(p[field] || 0)
+                        })),
+                        borderColor: '#00ff88',
+                        backgroundColor: 'rgba(0,255,136,0.08)',
+                        borderWidth: 2,
+                        pointRadius: points.length > 120 ? 0 : 2,
+                        pointHoverRadius: 5,
+                        pointHitRadius: 10,
+                        tension: 0.18,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    parsing: { xAxisKey: 'x', yAxisKey: 'y' },
+                    interaction: { mode: 'nearest', intersect: false, axis: 'x' },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            displayColors: false,
+                            callbacks: {
+                                title: items => {
+                                    const p = points[items[0].dataIndex];
+                                    return p ? `${p.label} since launch` : '';
+                                },
+                                label: context => `${metric.label}: ${metric.format(context.parsed.y)}`,
+                                afterBody: items => {
+                                    const p = points[items[0].dataIndex];
+                                    if (!p) return [];
+                                    return [
+                                        `Holders: ${intelTimelineMetrics.holders.format(p.holders)}`,
+                                        `Top 10 Supply: ${intelTimelineMetrics.top10_pct.format(p.top10_pct)}`,
+                                        `Dev Holding: ${intelTimelineMetrics.dev_pct.format(p.dev_pct)}`,
+                                        `Average Buy: ${intelTimelineMetrics.avg_buy_usd.format(p.avg_buy_usd)} (${Number(p.n_buys || 0).toLocaleString()} buys)`,
+                                        `Average Sell: ${intelTimelineMetrics.avg_sell_usd.format(p.avg_sell_usd)} (${Number(p.n_sells || 0).toLocaleString()} sells)`,
+                                        `Trades: ${intelTimelineMetrics.trades.format(p.trades)}`,
+                                        `Unique Buyers: ${intelTimelineMetrics.unique_buyers.format(p.unique_buyers)}`,
+                                        `Repeat Buyers: ${intelTimelineMetrics.repeat_buyer_pct.format(p.repeat_buyer_pct)}`,
+                                        `Liquidity: ${intelTimelineMetrics.liquidity_usd.format(p.liquidity_usd)}`,
+                                        `Largest Buy: ${intelTimelineMetrics.largest_buy_usd.format(p.largest_buy_usd)}`,
+                                        `Largest Sell: ${intelTimelineMetrics.largest_sell_usd.format(p.largest_sell_usd)}`,
+                                        `Top 5 Buyer Share: ${intelTimelineMetrics.top5_buyer_share_pct.format(p.top5_buyer_share_pct)}`
+                                    ];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            min: 0,
+                            max: points.length ? Number(points[points.length - 1].x) : undefined,
+                            grid: { color: 'rgba(100,120,150,0.10)' },
+                            ticks: {
+                                color: '#8b96a9',
+                                maxTicksLimit: 10,
+                                maxRotation: 0,
+                                callback: value => `${Number(value).toLocaleString()} ${lastIntelTimelineData.unit === 'min' ? 'min' : 'hr'}`
+                            },
+                            title: { display: true, text: lastIntelTimelineData.x_label || 'Time since launch', color: '#8b96a9' }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(100,120,150,0.14)' },
+                            ticks: { color: '#8b96a9', callback: formatAxis }
+                        }
+                    }
+                }
+            });
+        }
+
+        function changeIntelTimelineMetric() {
+            if (lastIntelTimelineData) renderIntelTimeline();
+        }
+
+        async function pollIntelTimeline(query) {
+            if (isCancelled) return;
+            try {
+                const resp = await fetch('/api/intel/timeline', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(query)
+                });
+                const data = await resp.json();
+                if (isCancelled) return;
+                if (resp.status === 202 || data.status === 'processing' || data.status === 'waiting') {
+                    activeTimelineTimer = setTimeout(() => pollIntelTimeline(query), 1500);
+                    return;
+                }
+                if (resp.ok && data.status === 'completed' && Array.isArray(data.points)) {
+                    lastIntelTimelineData = data;
+                    renderIntelTimeline();
+                    return;
+                }
+                const status = document.getElementById('intel-timeline-status');
+                status.style.display = '';
+                status.style.color = '#ffd166';
+                status.innerText = data.error || 'The snapshot is ready, but its timeline could not be generated.';
+            } catch (e) {
+                if (isCancelled) return;
+                const status = document.getElementById('intel-timeline-status');
+                status.style.display = '';
+                status.style.color = '#ffd166';
+                status.innerText = 'Could not load the timeline: ' + e;
+            }
         }
 
         async function runIntel() {
@@ -916,6 +1175,16 @@
             // Reset states
             isCancelled = false;
             results.style.display = 'none';
+            document.getElementById('intel-timeline-card').style.display = 'none';
+            if (activeTimelineTimer) {
+                clearTimeout(activeTimelineTimer);
+                activeTimelineTimer = null;
+            }
+            if (intelTimelineChart) {
+                intelTimelineChart.destroy();
+                intelTimelineChart = null;
+            }
+            lastIntelTimelineData = null;
             bar.style.width = '0%';
             pctLabel.innerText = '0%';
             loading.style.display = '';
@@ -991,6 +1260,8 @@
                             results.style.display = '';
                             btn.disabled = false;
                             btn.innerText = 'Get Intelligence ↵';
+                            showIntelTimelineLoading();
+                            pollIntelTimeline({ token: token, age: age, unit: unit, chain: chain });
                         }, 350);
                     } else {
                         if (activeTimer) clearInterval(activeTimer);
