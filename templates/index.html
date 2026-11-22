@@ -786,7 +786,7 @@
             <!-- Loading overlay: centered gif + smooth time-estimate bar + Stop button -->
             <div id="intel-loading" style="margin-top:20px; display:none;">
                 <div class="intel-card" style="display:flex; flex-direction:column; align-items:center; text-align:center;">
-                    <img src="{{ url_for('static', filename='loading.gif') }}"
+                    <img src="{{ url_for('static', filename='loading.gif', v=2) }}"
                          alt="Loading" style="max-width:320px; width:100%; border-radius:10px; margin:0 auto;">
                     <div style="margin-top:14px; font-family:var(--font-mono); color:var(--text-muted);">
                         <span id="intel-progress-label">Replaying blocks...</span>
