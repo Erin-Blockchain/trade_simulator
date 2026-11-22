@@ -36,7 +36,7 @@ import rh_backfill_v2 as V2
 JOB_STORE = {}
 TIMELINE_STORE = {}
 TIMELINE_STORE_MAX = 50
-background_executor = ThreadPoolExecutor(max_workers=8)
+background_executor = ThreadPoolExecutor(max_workers=2)
 # Timeline calculation is CPU-side after the one blockchain replay. Keep it on
 # a separate, bounded lane so it cannot delay the primary intelligence result.
 timeline_executor = ThreadPoolExecutor(max_workers=1)
@@ -634,16 +634,23 @@ class TimelineLimitError(ValueError):
     """The requested resolution would create an impractically large chart."""
 
 
-def _timeline_transfer_groups(transfers, block_timestamps):
-    """Collapse ERC-20 transfer logs by transaction while preserving event order."""
+def _timeline_transfer_groups(transfers, block_timestamps=None):
+    """Collapse ERC-20 transfer logs by transaction while preserving event order.
+
+    Robinhood supplies exact block timestamps for transfer blocks. BSC instead
+    advances transfers by block number against an _AgeClock at each chart point;
+    this avoids fetching one block header for every transfer block.
+    """
+    block_timestamps = block_timestamps or {}
     by_tx = {}
     for item in transfers:
         blk, frm, to, amount, tx, li = item
         tx = str(tx).lower()
         group = by_tx.get(tx)
         if group is None:
+            block = int(blk)
             group = {
-                "tx": tx, "block": int(blk), "ts": block_timestamps[int(blk)],
+                "tx": tx, "block": block, "ts": block_timestamps.get(block),
                 "events": [], "net": defaultdict(int), "mint_total": 0,
                 "mint_to": defaultdict(int),
             }
@@ -782,13 +789,24 @@ def _build_timeline_from_state(chain, state, requested_age_min, unit):
         dynamic_system_base = holder_system_base
     else:
         pool, store, _pricer = _bsc()
-        transfer_blocks = sorted({int(t[0]) for t in transfers})
-        transfer_bt = C.block_times(pool, transfer_blocks) if transfer_blocks else {}
-        bt = transfer_bt
+        # Do not fetch a block header for every transfer block. A busy token can
+        # have thousands of distinct transfer blocks; batching all of them was
+        # causing provider 429s and incomplete Infura batch replies. Use the
+        # same timestamp-bracketed block clock as the BSC feature pipeline to
+        # find the last block at each requested minute/hour boundary instead.
+        launch_block = int(state["launch_block"])
+        target_block = int(state["target_block"])
+        timeline_clock = _AgeClock(
+            pool, launch_block, launch_ts, store, target_block, end_ts
+        )
+        timeline_clock.end_ts = end_ts
+        timeline_clock.b_end = target_block
+
         dev = (state["dev"] or "").lower()
         qprice = float(state["quote_usd"])
         grad = state.get("grad")
-        grad_ts = bsc_block_ts(pool, int(grad["block"])) if grad else None
+        grad_block = int(grad["block"]) if grad else None
+        grad_ts = bsc_block_ts(pool, grad_block) if grad else None
         pm = None
         holder_system_base = {C.ZERO, C.DEAD, token, C.PORTAL, C.VAULT_PORTAL, C.TAX_TOKEN_HELPER, dev}
         buyer_system_base = {C.ZERO, C.DEAD, token, C.PORTAL, C.VAULT_PORTAL, C.TAX_TOKEN_HELPER}
@@ -796,10 +814,16 @@ def _build_timeline_from_state(chain, state, requested_age_min, unit):
         dynamic_system_base = holder_system_base
         zero_address = C.ZERO
 
-        # BSC rows have their real event timestamps filled by FN._times in bsc_intel.
-        for row in rows:
-            if row.get("t") is None:
-                row["t"] = C.block_times(pool, [int(row["block"])])[int(row["block"])]
+        # BSC rows normally already carry exact timestamps from FN._times in
+        # bsc_intel. Resolve any missing row timestamps together, not one by one.
+        missing_row_blocks = sorted({
+            int(row["block"]) for row in rows if row.get("t") is None
+        })
+        if missing_row_blocks:
+            missing_row_times = C.block_times(pool, missing_row_blocks)
+            for row in rows:
+                if row.get("t") is None:
+                    row["t"] = missing_row_times[int(row["block"])]
 
         def venues_at(ts):
             if grad and grad_ts is not None and ts >= grad_ts:
@@ -807,7 +831,7 @@ def _build_timeline_from_state(chain, state, requested_age_min, unit):
             return {C.PORTAL}
 
     rows.sort(key=lambda r: (int(r.get("t") or launch_ts), int(r.get("block", 0)), int(r.get("li", 0))))
-    transfer_timestamps = (bt if chain == "robinhood" else transfer_bt)
+    transfer_timestamps = bt if chain == "robinhood" else None
     groups, groups_by_tx = _timeline_transfer_groups(transfers, transfer_timestamps)
 
     balances = defaultdict(int)
@@ -859,11 +883,24 @@ def _build_timeline_from_state(chain, state, requested_age_min, unit):
 
     for elapsed_min in ages:
         target_ts = launch_ts + int(round(elapsed_min * 60))
+        # BSC transfer groups are ordered by block. Resolve only the block
+        # boundary for this chart point, rather than requesting timestamps for
+        # every transfer block in the token's history.
+        bsc_last_block = timeline_clock.last_block(target_ts) if chain == "bsc" else None
 
-        while group_idx < len(groups) and int(groups[group_idx]["ts"]) <= target_ts:
+        while group_idx < len(groups):
             group = groups[group_idx]
-            group_ts = int(group["ts"])
-            venues = venues_at(group_ts)
+            if chain == "bsc":
+                if int(group["block"]) > bsc_last_block:
+                    break
+                grad_pool = str(grad["pool"]).lower() if grad else None
+                venues = ({C.PORTAL, grad_pool}
+                          if grad_pool and grad_block is not None
+                          and int(group["block"]) >= grad_block else {C.PORTAL})
+            else:
+                if int(group["ts"]) > target_ts:
+                    break
+                venues = venues_at(int(group["ts"]))
             newly_active_venues = venues - active_venues
             if newly_active_venues:
                 remove_excluded(newly_active_venues)
