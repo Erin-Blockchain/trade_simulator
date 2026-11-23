@@ -187,6 +187,15 @@ def _rpc_solid(payload, tries=6):
             time.sleep(1.0)
     raise last
 
+def _latest_block_safe(tries=2):
+    """eth_blockNumber routed through post_rpc, so _ep_cool is honoured.
+    P.latest_block() bypasses that (raw rpc() with no endpoint resting),
+    which is what makes the SECOND run fail: endpoint cooldowns set during
+    the first run's hundreds of post_rpc calls are ignored, every attempt
+    hits a 429, and P.rpc() spins ~250 s before raising."""
+    j = _rpc_solid({"jsonrpc": "2.0", "id": 1,
+                    "method": "eth_blockNumber", "params": []}, tries=tries)
+    return int(j["result"], 16)
 
 def _money(x):
     return round(float(x), 2)
@@ -257,7 +266,7 @@ def _find_launch(token):
     if tok in _LAUNCH_CACHE:
         return _LAUNCH_CACHE[tok]
     tt = "0x" + "0" * 24 + tok[2:]
-    tip = P.latest_block()
+    tip = _latest_block_safe() 
     lo = tip
     while lo > tip - 3_000_000:
         frm = max(lo - 300_000, tip - 3_000_000)
@@ -299,7 +308,7 @@ def rh_intel(token, age_min, return_timeline_data=False):
         raise LookupError("Launch event not found for this token.")
     factory = P.PONS_FACTORIES[0][1].lower()
 
-    tip = P.latest_block()
+    tip = _latest_block_safe()
     tip_ts = CS._block_ts_req(_rpc_solid, tip)
     launch_ts = CS._block_ts_req(_rpc_solid, lblock)
     end_ts = int(launch_ts + age_min * 60)
