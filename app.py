@@ -11,7 +11,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 # token-intelligence backend: Robinhood (Transfer-replay + swap read, validated vs GMGN)
 import rh_pipeline as P
-P.configure_endpoints(verbose=True)
 import rh_holder_features as HF
 import rh_curve_swaps as CS
 
@@ -172,28 +171,20 @@ def simulate():
 # age on REAL block timestamps (never a block count).
 # --------------------------------------------------------------------------- #
 
-def _rpc_solid(payload, tries=6, scan=False):
-    """RPC with retry; route scan requests through the reserved endpoint."""
+def _rpc_solid(payload, tries=6):
+    """RPC with retry; short timeout so the web request can't hang."""
     last = None
-
     for i in range(tries):
         try:
-            if scan:
-                j = P.scan_post(payload, timeout=10)
-            else:
-                j = P.post_rpc(payload, timeout=10)
-
+            j = P.post_rpc(payload, timeout=10)
             if isinstance(j, dict) and j.get("error"):
                 raise RuntimeError(j["error"])
-
             return j
-
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:                              # noqa: BLE001
             last = e
             if i == tries - 1:
                 raise
             time.sleep(1.0)
-
     raise last
 
 
@@ -242,6 +233,14 @@ def _bsc_feat_new():
 _LAUNCH_CACHE = {}      # token -> (lblock, curve, deployer); launches never change
 _RH_POOL = []
 
+# Launchpad eligibility is immutable for a token. Cache positive checks for a
+# day and negative checks briefly so browsing unsupported tokens does not
+# repeatedly scan the same launch history.
+_LAUNCH_VERIFY_CACHE = {}  # (chain, token) -> (expires_at, response)
+_LAUNCH_VERIFY_LOCK = threading.Lock()
+_LAUNCH_VERIFY_POSITIVE_TTL = 24 * 60 * 60
+_LAUNCH_VERIFY_NEGATIVE_TTL = 5 * 60
+
 
 def _rh_pool():
     """bsc_rpc Pool over the Robinhood endpoints, only for the Transfer read
@@ -266,7 +265,7 @@ def _find_launch(token):
                         "params": [{"address": P.PONS_FACTORIES[0][1],
                                     "topics": [LAUNCH_TOPIC, tt],
                                     "fromBlock": hex(frm),
-                                    "toBlock": hex(lo)}]}, scan=True)
+                                    "toBlock": hex(lo)}]})
         res = (j or {}).get("result") or []
         if res:
             lg = res[0]
@@ -303,13 +302,6 @@ def rh_intel(token, age_min, return_timeline_data=False):
     tip = P.latest_block()
     tip_ts = CS._block_ts_req(_rpc_solid, tip)
     launch_ts = CS._block_ts_req(_rpc_solid, lblock)
-    print(
-    f"[RH-TIMESTAMP] token={token} "
-    f"lblock={lblock} tip={tip} "
-    f"tip_ts={tip_ts} launch_ts={launch_ts} "
-    f"age_min={age_min} "
-    f"cached_launch_ts={CS._BTS_CACHE.get(lblock)}"
-    )
     end_ts = int(launch_ts + age_min * 60)
 
     # snapshot = the LAST block stamped at or before launch + age (every block
@@ -540,6 +532,80 @@ def _bsc_launch(pool, store, token):
     if not L:
         raise LookupError("This token is not a Flap launch (no TokenCreated in its mint block).")
     return L
+
+
+def _verify_launchpad(chain, token):
+    """Verify a token against the exact launch source used by its intel path.
+
+    Robinhood: TokenLaunched event emitted by P.PONS_FACTORIES[0].
+    BSC: TokenCreated launch parsed from the configured Flap Portal (C.PORTAL)
+         in the token's first-mint block, via _bsc_launch / PortalStore.
+    """
+    chain = str(chain).lower()
+    token = str(token).lower()
+    cache_key = (chain, token)
+    now = time.time()
+
+    with _LAUNCH_VERIFY_LOCK:
+        cached = _LAUNCH_VERIFY_CACHE.get(cache_key)
+        if cached and cached[0] > now:
+            return dict(cached[1])
+        if cached:
+            _LAUNCH_VERIFY_CACHE.pop(cache_key, None)
+
+    if chain == "robinhood":
+        launch_block, _curve, _deployer = _find_launch(token)
+        if launch_block is None:
+            result = {
+                "supported": False,
+                "chain": chain,
+                "launchpad": "Puns",
+                "message": "This token was not found in the configured Puns factory launch events.",
+            }
+            ttl = _LAUNCH_VERIFY_NEGATIVE_TTL
+        else:
+            result = {
+                "supported": True,
+                "chain": chain,
+                "launchpad": "Puns",
+                "launch_block": int(launch_block),
+                "factory": P.PONS_FACTORIES[0][1].lower(),
+                "message": "Verified Puns launch.",
+            }
+            ttl = _LAUNCH_VERIFY_POSITIVE_TTL
+
+    elif chain == "bsc":
+        pool, store, _pricer = _bsc()
+        try:
+            launch = _bsc_launch(pool, store, token)
+        except LookupError as exc:
+            result = {
+                "supported": False,
+                "chain": chain,
+                "launchpad": "Flap",
+                "message": (
+                    "This token could not be verified as a Flap launch. "
+                    "It may belong to another launchpad or fall outside the configured launch-search range."
+                ),
+                "detail": str(exc),
+            }
+            ttl = _LAUNCH_VERIFY_NEGATIVE_TTL
+        else:
+            result = {
+                "supported": True,
+                "chain": chain,
+                "launchpad": "Flap",
+                "launch_block": int(launch["block"]),
+                "portal": C.PORTAL.lower(),
+                "message": "Verified Flap launch.",
+            }
+            ttl = _LAUNCH_VERIFY_POSITIVE_TTL
+    else:
+        raise ValueError("Unsupported chain.")
+
+    with _LAUNCH_VERIFY_LOCK:
+        _LAUNCH_VERIFY_CACHE[cache_key] = (time.time() + ttl, dict(result))
+    return result
 
 
 def bsc_intel(token, age_min, return_timeline_data=False):
@@ -1132,6 +1198,35 @@ SKIP_MESSAGES = {
     "unsupported_venue": "This coin trades on a pool type Seekal doesn't support yet.",
     "too_many_transfers": "This coin has too many token transfers to replay.",
 }
+
+
+@app.route('/api/launchpad/verify', methods=['POST'])
+def verify_launchpad():
+    """Confirm the token belongs to Seekal's configured launchpad on its chain.
+
+    This is intentionally called only after a user clicks the extension button:
+    BSC verification may need a first-mint history scan, so it should not run
+    automatically for every chart a user browses.
+    """
+    data = request.get_json(silent=True) or {}
+    token = (data.get("token") or "").strip().lower()
+    chain = (data.get("chain") or "").strip().lower()
+
+    if chain not in SUPPORTED_CHAINS:
+        return jsonify({"error": "Seekal currently supports Robinhood Chain and BNB Chain only."}), 400
+    if not (token.startswith("0x") and len(token) == 42):
+        return jsonify({"error": "Enter a valid token contract address."}), 400
+
+    try:
+        result = _verify_launchpad(chain, token)
+        return jsonify(result)
+    except Exception:
+        import traceback
+        print(f"[launchpad-verify] {chain} {token} failed:", flush=True)
+        traceback.print_exc()
+        return jsonify({
+            "error": "Seekal could not verify this token's launchpad right now. Please try again."
+        }), 503
 
 
 @app.route('/api/intel', methods=['POST'])
