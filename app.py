@@ -173,19 +173,27 @@ def simulate():
 # --------------------------------------------------------------------------- #
 
 def _rpc_solid(payload, tries=6, scan=False):
-    """RPC with retry; short timeout so the web request can't hang."""
+    """RPC with retry; route scan requests through the reserved endpoint."""
     last = None
+
     for i in range(tries):
         try:
-            j = P.post_rpc(payload, timeout=10, scan=scan)
+            if scan:
+                j = P.scan_post(payload, timeout=10)
+            else:
+                j = P.post_rpc(payload, timeout=10)
+
             if isinstance(j, dict) and j.get("error"):
                 raise RuntimeError(j["error"])
+
             return j
+
         except Exception as e:  # noqa: BLE001
             last = e
             if i == tries - 1:
                 raise
             time.sleep(1.0)
+
     raise last
 
 
