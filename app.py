@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 # token-intelligence backend: Robinhood (Transfer-replay + swap read, validated vs GMGN)
 import rh_pipeline as P
+P.configure_endpoints(verbose=True)
 import rh_holder_features as HF
 import rh_curve_swaps as CS
 
@@ -171,16 +172,16 @@ def simulate():
 # age on REAL block timestamps (never a block count).
 # --------------------------------------------------------------------------- #
 
-def _rpc_solid(payload, tries=6):
+def _rpc_solid(payload, tries=6, scan=False):
     """RPC with retry; short timeout so the web request can't hang."""
     last = None
     for i in range(tries):
         try:
-            j = P.post_rpc(payload, timeout=10)
+            j = P.post_rpc(payload, timeout=10, scan=scan)
             if isinstance(j, dict) and j.get("error"):
                 raise RuntimeError(j["error"])
             return j
-        except Exception as e:                              # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
             last = e
             if i == tries - 1:
                 raise
@@ -257,7 +258,7 @@ def _find_launch(token):
                         "params": [{"address": P.PONS_FACTORIES[0][1],
                                     "topics": [LAUNCH_TOPIC, tt],
                                     "fromBlock": hex(frm),
-                                    "toBlock": hex(lo)}]})
+                                    "toBlock": hex(lo)}]}, scan=True)
         res = (j or {}).get("result") or []
         if res:
             lg = res[0]
