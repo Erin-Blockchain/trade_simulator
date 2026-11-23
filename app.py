@@ -293,6 +293,7 @@ def rh_intel(token, age_min, return_timeline_data=False):
 
     tip = P.latest_block()
     tip_ts = CS._block_ts_req(_rpc_solid, tip)
+    launch_ts = CS._block_ts_req(_rpc_solid, lblock)
     print(
     f"[RH-TIMESTAMP] token={token} "
     f"lblock={lblock} tip={tip} "
